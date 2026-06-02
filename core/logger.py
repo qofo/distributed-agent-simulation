@@ -1,0 +1,93 @@
+import json
+import logging
+import threading
+from typing import Any, Dict, Optional
+from pathlib import Path
+
+from core.log_schema import LogEvent, EventType
+
+class JSONLinesFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        # The record.msg is expected to be a LogEvent dictionary or object
+        if isinstance(record.msg, LogEvent):
+            return json.dumps(record.msg.to_dict())
+        elif isinstance(record.msg, dict):
+            return json.dumps(record.msg)
+        return json.dumps({"message": str(record.msg)})
+
+class StructuredLogger:
+    _instances = {}
+    _lock = threading.Lock()
+
+    def __new__(cls, name: str, log_file: Optional[str] = None):
+        """Implement a thread-safe singleton pattern per logger name."""
+        with cls._lock:
+            if name not in cls._instances:
+                instance = super(StructuredLogger, cls).__new__(cls)
+                cls._instances[name] = instance
+                instance._init_logger(name, log_file)
+            return cls._instances[name]
+
+    def _init_logger(self, name: str, log_file: Optional[str]):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(logging.INFO)
+        
+        # Avoid adding multiple handlers if already initialized
+        if not self.logger.handlers:
+            self.logger.propagate = False
+            formatter = JSONLinesFormatter()
+
+            # Optional file handler
+            if log_file:
+                # Ensure directory exists
+                Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+                file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
+                file_handler.setFormatter(formatter)
+                self.logger.addHandler(file_handler)
+
+            # Console handler
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(formatter)
+            self.logger.addHandler(console_handler)
+
+    def log_event(self, event: LogEvent):
+        """Log a generic event."""
+        self.logger.info(event)
+
+    # Helper methods for common events
+    def task_received(self, trace_id: str, architecture: str, task_id: str, details: Optional[Dict[str, Any]] = None):
+        event = LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, 
+                         event_type=EventType.TASK_RECEIVED, details=details or {})
+        self.log_event(event)
+
+    def task_completed(self, trace_id: str, architecture: str, task_id: str, details: Optional[Dict[str, Any]] = None):
+        event = LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, 
+                         event_type=EventType.TASK_COMPLETED, details=details or {})
+        self.log_event(event)
+
+    def inference_start(self, trace_id: str, architecture: str, task_id: str, worker_id: str, details: Optional[Dict[str, Any]] = None):
+        event = LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, 
+                         event_type=EventType.INFERENCE_START, worker_id=worker_id, details=details or {})
+        self.log_event(event)
+
+    def inference_end(self, trace_id: str, architecture: str, task_id: str, worker_id: str, latency_ms: int, details: Optional[Dict[str, Any]] = None):
+        det = details or {}
+        det["latency_ms"] = latency_ms
+        event = LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, 
+                         event_type=EventType.INFERENCE_END, worker_id=worker_id, details=det)
+        self.log_event(event)
+
+    def queued(self, trace_id: str, architecture: str, task_id: str, details: Optional[Dict[str, Any]] = None):
+        event = LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, 
+                         event_type=EventType.QUEUED, details=details or {})
+        self.log_event(event)
+
+    def dequeued(self, trace_id: str, architecture: str, task_id: str, worker_id: str, details: Optional[Dict[str, Any]] = None):
+        event = LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, 
+                         event_type=EventType.DEQUEUED, worker_id=worker_id, details=details or {})
+        self.log_event(event)
+
+    def error_crash(self, trace_id: str, architecture: str, task_id: str, worker_id: str, reason: str):
+        event = LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, 
+                         event_type=EventType.CRASH, worker_id=worker_id, details={"reason": reason})
+        self.log_event(event)
