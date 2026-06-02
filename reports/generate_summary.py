@@ -48,6 +48,30 @@ def generate_report(batch_dir: Path):
     plt.savefig(latency_chart)
     plt.close()
 
+    # 2.5 Task B Overhead Chart
+    # Task B runs are at index 5, 6, 7, 10, 11, 13 based on batch_run.py MATRIX
+    task_b_indices = [5, 6, 7, 10, 11, 13]
+    # Ensure indices exist in dataframe
+    valid_indices = [idx for idx in task_b_indices if idx in df.index]
+    task_b_df = df.loc[valid_indices]
+    
+    overhead_chart = None
+    if not task_b_df.empty:
+        plt.figure(figsize=(10, 6))
+        # Bar 1: Total Latency
+        plt.bar(task_b_df['run_name'], task_b_df['p50_latency_sec'], label='Total Latency (p50)', color='lightgray')
+        # Bar 2: Avg Queue Wait (overlay)
+        plt.bar(task_b_df['run_name'], task_b_df['avg_queue_wait_sec'], label='Avg Queue Wait Time (per step)', color='orange')
+        
+        plt.title('Communication Overhead in Task B (Sequential Chained Tasks)')
+        plt.ylabel('Seconds')
+        plt.xticks(rotation=45, ha='right')
+        plt.legend()
+        plt.tight_layout()
+        overhead_chart = reports_dir / 'overhead_task_b.png'
+        plt.savefig(overhead_chart)
+        plt.close()
+
     # 3. Markdown Report
     md_path = reports_dir / "summary.md"
     with open(md_path, "w", encoding="utf-8") as f:
@@ -60,7 +84,10 @@ def generate_report(batch_dir: Path):
         f.write("### Throughput\n")
         f.write(f"![Throughput]({throughput_chart.name})\n\n")
         f.write("### Latency\n")
-        f.write(f"![Latency]({latency_chart.name})\n")
+        f.write(f"![Latency]({latency_chart.name})\n\n")
+        if overhead_chart:
+            f.write("### Communication Overhead (Task B)\n")
+            f.write(f"![Overhead]({overhead_chart.name})\n")
         
     print(f"Report generated successfully at {md_path}")
 
