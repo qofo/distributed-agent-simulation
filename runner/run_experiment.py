@@ -75,9 +75,25 @@ def main():
         
         print(f"[{datetime.now().isoformat()}] INFO: Starting run {run_id} (Arch: {config.experiment.architecture})")
         
-        # 6. Execute architecture logic (Placeholder for now)
-        # TODO: Dynamically load architectures based on config.experiment.architecture
-        print(f"[{datetime.now().isoformat()}] INFO: Architecture execution will be implemented in future phases.")
+        # 6. Execute architecture logic
+        if config.experiment.architecture == "monolithic":
+            from architectures.monolithic.executor import execute as run_monolithic
+            print(f"[{datetime.now().isoformat()}] INFO: Running Monolithic Architecture")
+            run_monolithic(config, logger, run_id, trace_id)
+        elif config.experiment.architecture == "master_worker":
+            from architectures.master_worker.executor import execute as run_master_worker
+            print(f"[{datetime.now().isoformat()}] INFO: Running Master-Worker Architecture")
+            run_master_worker(config, logger, run_id, trace_id)
+        elif config.experiment.architecture == "queue_based":
+            from architectures.queue_based.executor import execute as run_queue_based
+            print(f"[{datetime.now().isoformat()}] INFO: Running Queue-Based Architecture")
+            run_queue_based(config, logger, run_id, trace_id)
+        elif config.experiment.architecture == "swarm":
+            from architectures.swarm.executor import execute as run_swarm
+            print(f"[{datetime.now().isoformat()}] INFO: Running Swarm Architecture")
+            run_swarm(config, logger, run_id, trace_id)
+        else:
+            print(f"[{datetime.now().isoformat()}] INFO: Architecture '{config.experiment.architecture}' execution is not implemented yet.")
         
         # Simulate successful completion
         logger.task_completed(trace_id, config.experiment.architecture, "runner-finish", {"status": "success"})
