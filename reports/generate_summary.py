@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import argparse
 from pathlib import Path
 
-def generate_report(batch_dir: Path):
+def generate_report(batch_dir: Path, output_dir: Path):
     csv_path = batch_dir / "summary.csv"
     if not csv_path.exists():
         print(f"Error: {csv_path} not found.")
@@ -12,74 +12,77 @@ def generate_report(batch_dir: Path):
     df = pd.read_csv(csv_path)
     # df has columns: architecture,total_requests,completed_requests,total_duration_sec,throughput_req_per_sec,p50_latency_sec,p95_latency_sec,p99_latency_sec,avg_queue_wait_sec,retries,timeouts,crashes
     
-    # We need to distinguish between Task A and Task B runs. 
-    # But batch_run didn't put task_type or worker_count in the CSV! 
-    # Let's fix that conceptually, but since the CSV is what we have, we'll plot by architecture and order.
-    # Actually, the CSV only has the output of metrics_parser which didn't include worker_count.
-    # Let's just create simple charts based on the index.
+    # Group by run_name to calculate mean and standard deviation across iterations
+    agg_df = df.groupby('run_name').agg({
+        'throughput_req_per_sec': ['mean', 'std'],
+        'p50_latency_sec': ['mean', 'std'],
+        'p99_latency_sec': ['mean', 'std'],
+        'avg_queue_wait_sec': ['mean', 'std']
+    }).reset_index()
     
-    # Let's add a "run_name" column based on the index or architecture
-    df['run_name'] = df['architecture'] + "_" + df.index.astype(str)
+    # Flatten multi-level columns
+    agg_df.columns = ['_'.join(col).strip() if col[1] else col[0] for col in agg_df.columns.values]
     
-    reports_dir = Path(__file__).resolve().parent
-    reports_dir.mkdir(exist_ok=True)
+    # Sort for consistent charting
+    agg_df = agg_df.sort_values('run_name')
+    
+    # Output directory
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     # 1. Throughput Chart
-    plt.figure(figsize=(10, 6))
-    plt.bar(df['run_name'], df['throughput_req_per_sec'], color='skyblue')
-    plt.title('Throughput across Runs')
+    plt.figure(figsize=(12, 6))
+    plt.bar(agg_df['run_name'], agg_df['throughput_req_per_sec_mean'], yerr=agg_df['throughput_req_per_sec_std'], capsize=5, color='skyblue')
+    plt.title('Throughput across Configurations (with StdDev)')
     plt.ylabel('Req/sec')
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
-    throughput_chart = reports_dir / 'throughput.png'
+    throughput_chart = output_dir / 'throughput.png'
     plt.savefig(throughput_chart)
     plt.close()
     
     # 2. Latency Chart
-    plt.figure(figsize=(10, 6))
-    plt.plot(df['run_name'], df['p50_latency_sec'], marker='o', label='p50')
-    plt.plot(df['run_name'], df['p99_latency_sec'], marker='x', label='p99')
-    plt.title('Latency across Runs')
+    plt.figure(figsize=(12, 6))
+    plt.errorbar(agg_df['run_name'], agg_df['p50_latency_sec_mean'], yerr=agg_df['p50_latency_sec_std'], fmt='-o', label='p50 Mean')
+    plt.errorbar(agg_df['run_name'], agg_df['p99_latency_sec_mean'], yerr=agg_df['p99_latency_sec_std'], fmt='-x', label='p99 Mean')
+    plt.title('Latency across Configurations (with StdDev)')
     plt.ylabel('Seconds')
     plt.xticks(rotation=45, ha='right')
     plt.legend()
     plt.tight_layout()
-    latency_chart = reports_dir / 'latency.png'
+    latency_chart = output_dir / 'latency.png'
     plt.savefig(latency_chart)
     plt.close()
 
     # 2.5 Task B Overhead Chart
-    # Task B runs are at index 5, 6, 7, 10, 11, 13 based on batch_run.py MATRIX
-    task_b_indices = [5, 6, 7, 10, 11, 13]
-    # Ensure indices exist in dataframe
-    valid_indices = [idx for idx in task_b_indices if idx in df.index]
-    task_b_df = df.loc[valid_indices]
+    task_b_df = agg_df[agg_df['run_name'].str.contains("_TB_")]
     
     overhead_chart = None
     if not task_b_df.empty:
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(12, 6))
         # Bar 1: Total Latency
-        plt.bar(task_b_df['run_name'], task_b_df['p50_latency_sec'], label='Total Latency (p50)', color='lightgray')
+        plt.bar(task_b_df['run_name'], task_b_df['p50_latency_sec_mean'], yerr=task_b_df['p50_latency_sec_std'], capsize=5, label='Total Latency (p50)', color='lightgray')
         # Bar 2: Avg Queue Wait (overlay)
-        plt.bar(task_b_df['run_name'], task_b_df['avg_queue_wait_sec'], label='Avg Queue Wait Time (per step)', color='orange')
+        plt.bar(task_b_df['run_name'], task_b_df['avg_queue_wait_sec_mean'], label='Avg Queue Wait Time', color='orange')
         
         plt.title('Communication Overhead in Task B (Sequential Chained Tasks)')
         plt.ylabel('Seconds')
         plt.xticks(rotation=45, ha='right')
         plt.legend()
         plt.tight_layout()
-        overhead_chart = reports_dir / 'overhead_task_b.png'
+        overhead_chart = output_dir / 'overhead_task_b.png'
         plt.savefig(overhead_chart)
         plt.close()
 
     # 3. Markdown Report
-    md_path = reports_dir / "summary.md"
+    md_path = output_dir / "summary.md"
     with open(md_path, "w", encoding="utf-8") as f:
         f.write("# Distributed Agent Simulation Summary Report\n\n")
         f.write("## 1. Overview\n")
         f.write(f"Generated from batch: `{batch_dir.name}`\n\n")
-        f.write("## 2. Metrics Data\n")
-        f.write(df.to_markdown(index=False) + "\n\n")
+        f.write("## 2. Aggregate Metrics Data\n")
+        # Round the metrics for better display
+        display_df = agg_df.round(3)
+        f.write(display_df.to_markdown(index=False) + "\n\n")
         f.write("## 3. Charts\n")
         f.write("### Throughput\n")
         f.write(f"![Throughput]({throughput_chart.name})\n\n")
@@ -94,6 +97,11 @@ def generate_report(batch_dir: Path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_dir", required=True, type=str, help="Path to batch directory containing summary.csv")
+    parser.add_argument("--output_dir", type=str, default="reports", help="Directory to save the reports to")
     args = parser.parse_args()
     
-    generate_report(Path(args.batch_dir))
+    out_path = Path(args.output_dir)
+    if not out_path.is_absolute():
+        out_path = Path.cwd() / args.output_dir
+    
+    generate_report(Path(args.batch_dir), out_path)

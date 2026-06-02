@@ -19,6 +19,8 @@ class FailureInjectionConfig:
 class WorkloadConfig:
     chunk_count: int = 1
     dataset_path: str = ""
+    total_requests: int = 1
+    requests_per_second: float = 1.0
 
 @dataclass
 class SimulationConfig:
@@ -78,7 +80,9 @@ def load_config(file_path: str) -> GlobalConfig:
 
     workload = WorkloadConfig(
         chunk_count=workload_data.get('chunk_count', 1),
-        dataset_path=workload_data.get('dataset_path', '')
+        dataset_path=workload_data.get('dataset_path', ''),
+        total_requests=workload_data.get('total_requests', 1),
+        requests_per_second=float(workload_data.get('requests_per_second', 1.0))
     )
 
     experiment = ExperimentConfig(

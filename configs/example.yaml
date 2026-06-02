@@ -7,6 +7,8 @@ experiment:
 workload:
   chunk_count: 10
   dataset_path: "./data/dummy_task_a.json"
+  total_requests: 10
+  requests_per_second: 5.0
 
 simulation:
   mock_inference_latency_ms: 50
@@ -20,3 +22,4 @@ failure_injection:
   target_worker_id: null
   timing_ms: 0
   straggler_delay_ms: 0
+

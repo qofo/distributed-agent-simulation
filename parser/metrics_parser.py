@@ -11,7 +11,7 @@ from typing import Dict, List, Any
 def parse_time(time_str: str) -> datetime:
     return datetime.fromisoformat(time_str.replace("Z", "+00:00"))
 
-def compute_metrics(log_file: Path) -> Dict[str, Any]:
+def compute_metrics(log_file: Path, run_name: str) -> Dict[str, Any]:
     events = []
     with open(log_file, "r", encoding="utf-8") as f:
         for line in f:
@@ -83,6 +83,7 @@ def compute_metrics(log_file: Path) -> Dict[str, Any]:
     throughput = (completed_requests / total_duration_sec) if total_duration_sec > 0 else 0.0
 
     return {
+        "run_name": run_name,
         "architecture": architecture,
         "total_requests": len(request_start_times),
         "completed_requests": completed_requests,
@@ -114,6 +115,7 @@ def main():
     parser = argparse.ArgumentParser(description="Distributed Agent Simulation Metrics Parser")
     parser.add_argument("--log_dir", type=str, required=True, help="Path to the directory containing events.jsonl")
     parser.add_argument("--output_csv", type=str, default="results/summary_metrics.csv", help="Path to output CSV")
+    parser.add_argument("--run_name", type=str, default="unknown", help="Name of the run")
     args = parser.parse_args()
 
     log_path = Path(args.log_dir) / "events.jsonl"
@@ -122,7 +124,7 @@ def main():
         sys.exit(1)
 
     print(f"Parsing {log_path}...")
-    metrics = compute_metrics(log_path)
+    metrics = compute_metrics(log_path, args.run_name)
     
     if not metrics:
         print("No valid events found to parse.")

@@ -11,6 +11,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from core.config import load_config, GlobalConfig
 from core.logger import StructuredLogger, EventType
+import asyncio
 
 def generate_run_id(config: GlobalConfig) -> str:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -30,6 +31,28 @@ def setup_run_directories(run_id: str) -> dict:
         "log_dir": run_log_dir,
         "result_dir": run_result_dir
     }
+
+async def run_single_request(run_func, config: GlobalConfig, logger: StructuredLogger, run_id: str, req_index: int):
+    trace_id = f"sys-{run_id}-req-{req_index}"
+    logger.task_received(trace_id, config.experiment.architecture, "request-init", {"req_index": req_index})
+    
+    # Execute the architecture block synchronously in a thread
+    await asyncio.to_thread(run_func, config, logger, run_id, trace_id)
+    
+    logger.task_completed(trace_id, config.experiment.architecture, "request-finish", {"status": "success"})
+
+async def execute_all_requests(run_func, config: GlobalConfig, logger: StructuredLogger, run_id: str):
+    total_requests = config.workload.total_requests
+    rps = config.workload.requests_per_second
+    sleep_interval = 1.0 / rps if rps > 0 else 0
+    
+    tasks = []
+    for i in range(total_requests):
+        tasks.append(asyncio.create_task(run_single_request(run_func, config, logger, run_id, i)))
+        if sleep_interval > 0 and i < total_requests - 1:
+            await asyncio.sleep(sleep_interval)
+            
+    await asyncio.gather(*tasks)
 
 def main():
     parser = argparse.ArgumentParser(description="Distributed Agent Simulation Runner")
@@ -71,32 +94,29 @@ def main():
         
         # Log system start
         trace_id = f"sys-{run_id}"
-        logger.task_received(trace_id, config.experiment.architecture, "runner-init", {"run_id": run_id})
         
-        print(f"[{datetime.now().isoformat()}] INFO: Starting run {run_id} (Arch: {config.experiment.architecture})")
+        print(f"[{datetime.now().isoformat()}] INFO: Starting run {run_id} (Arch: {config.experiment.architecture}, Requests: {config.workload.total_requests})")
         
         # 6. Execute architecture logic
+        run_func = None
         if config.experiment.architecture == "monolithic":
             from architectures.monolithic.executor import execute as run_monolithic
-            print(f"[{datetime.now().isoformat()}] INFO: Running Monolithic Architecture")
-            run_monolithic(config, logger, run_id, trace_id)
+            run_func = run_monolithic
         elif config.experiment.architecture == "master_worker":
             from architectures.master_worker.executor import execute as run_master_worker
-            print(f"[{datetime.now().isoformat()}] INFO: Running Master-Worker Architecture")
-            run_master_worker(config, logger, run_id, trace_id)
+            run_func = run_master_worker
         elif config.experiment.architecture == "queue_based":
             from architectures.queue_based.executor import execute as run_queue_based
-            print(f"[{datetime.now().isoformat()}] INFO: Running Queue-Based Architecture")
-            run_queue_based(config, logger, run_id, trace_id)
+            run_func = run_queue_based
         elif config.experiment.architecture == "swarm":
             from architectures.swarm.executor import execute as run_swarm
-            print(f"[{datetime.now().isoformat()}] INFO: Running Swarm Architecture")
-            run_swarm(config, logger, run_id, trace_id)
+            run_func = run_swarm
         else:
             print(f"[{datetime.now().isoformat()}] INFO: Architecture '{config.experiment.architecture}' execution is not implemented yet.")
-        
-        # Simulate successful completion
-        logger.task_completed(trace_id, config.experiment.architecture, "runner-finish", {"status": "success"})
+            sys.exit(1)
+            
+        print(f"[{datetime.now().isoformat()}] INFO: Running {config.experiment.architecture} Architecture...")
+        asyncio.run(execute_all_requests(run_func, config, logger, run_id))
         
         print(f"[{datetime.now().isoformat()}] INFO: Run {run_id} completed successfully.")
         sys.exit(0)

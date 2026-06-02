@@ -15,7 +15,9 @@ CONFIG_TEMPLATE = {
     },
     "workload": {
         "chunk_count": 10,
-        "dataset_path": "./data/dummy.json"
+        "dataset_path": "./data/dummy.json",
+        "total_requests": 30,
+        "requests_per_second": 10.0
     },
     "simulation": {
         "mock_inference_latency_ms": 100,
@@ -74,70 +76,74 @@ def run_batch():
     print(f"Starting batch experiment: {batch_id}")
     print(f"Total configurations to run: {len(MATRIX)}")
     
-    run_log_dirs = []
+    run_log_info = []
     
     for idx, params in enumerate(MATRIX):
         arch = params["arch"]
         task = params["task"]
         workers = params["workers"]
         
-        name = f"run_{idx:02d}_{arch}_T{task}_W{workers}"
-        
-        # Build Config
-        cfg = json.loads(json.dumps(CONFIG_TEMPLATE))  # Deep copy
-        cfg["experiment"]["name"] = name
-        cfg["experiment"]["architecture"] = arch
-        cfg["experiment"]["task_type"] = task
-        cfg["experiment"]["worker_count"] = workers
-        cfg["workload"]["chunk_count"] = params["chunks"]
-        cfg["simulation"]["mock_inference_latency_ms"] = params["latency"]
-        
+        base_name = f"run_{idx:02d}_{arch}_T{task}_W{workers}"
         if "straggler_target" in params:
-            name += "_straggler"
-            cfg["experiment"]["name"] = name
-            cfg["failure_injection"]["mode"] = "straggler"
-            cfg["failure_injection"]["target_worker_id"] = params["straggler_target"]
-            cfg["failure_injection"]["straggler_delay_ms"] = params.get("straggler_delay", 500)
+            base_name += "_straggler"
         elif "crash_target" in params:
-            name += "_crash"
+            base_name += "_crash"
+            
+        iterations = params.get("iterations", 3)
+        for i in range(iterations):
+            name = f"{base_name}_iter{i}"
+            
+            # Build Config
+            cfg = json.loads(json.dumps(CONFIG_TEMPLATE))  # Deep copy
             cfg["experiment"]["name"] = name
-            cfg["failure_injection"]["mode"] = "crash"
-            cfg["failure_injection"]["target_worker_id"] = params["crash_target"]
-        
-        cfg_path = temp_configs_dir / f"{name}.yaml"
-        with open(cfg_path, "w", encoding="utf-8") as f:
-            yaml.dump(cfg, f)
+            cfg["experiment"]["architecture"] = arch
+            cfg["experiment"]["task_type"] = task
+            cfg["experiment"]["worker_count"] = workers
+            cfg["workload"]["chunk_count"] = params["chunks"]
+            cfg["simulation"]["mock_inference_latency_ms"] = params["latency"]
             
-        print(f"[{idx+1}/{len(MATRIX)}] Executing {name} ...")
-        
-        # Run subprocess
-        runner_path = BASE_DIR / "runner" / "run_experiment.py"
-        result = subprocess.run(
-            ["python", str(runner_path), "--config", str(cfg_path)],
-            capture_output=True,
-            text=True,
-            cwd=str(BASE_DIR)
-        )
-        
-        if result.returncode != 0:
-            print(f"  -> ERROR: {name} failed.")
-            print(result.stderr)
-            continue
+            if "straggler_target" in params:
+                cfg["failure_injection"]["mode"] = "straggler"
+                cfg["failure_injection"]["target_worker_id"] = params["straggler_target"]
+                cfg["failure_injection"]["straggler_delay_ms"] = params.get("straggler_delay", 500)
+            elif "crash_target" in params:
+                cfg["failure_injection"]["mode"] = "crash"
+                cfg["failure_injection"]["target_worker_id"] = params["crash_target"]
             
-        # Parse run_id from stdout
-        # Expecting line: INFO: Starting run <run_id> (Arch: ...)
-        run_id = None
-        for line in result.stdout.split('\n'):
-            if "INFO: Starting run " in line:
-                parts = line.split("INFO: Starting run ")[1]
-                run_id = parts.split(" ")[0]
-                break
+            cfg_path = temp_configs_dir / f"{name}.yaml"
+            with open(cfg_path, "w", encoding="utf-8") as f:
+                yaml.dump(cfg, f)
                 
-        if run_id:
-            print(f"  -> Success. Run ID: {run_id}")
-            run_log_dirs.append(BASE_DIR / "logs" / "runs" / run_id)
-        else:
-            print(f"  -> Warning: Could not parse run_id for {name}")
+            print(f"[{idx+1}/{len(MATRIX)} - Iter {i+1}/{iterations}] Executing {name} ...")
+            
+            # Run subprocess
+            runner_path = BASE_DIR / "runner" / "run_experiment.py"
+            result = subprocess.run(
+                ["python", str(runner_path), "--config", str(cfg_path)],
+                capture_output=True,
+                text=True,
+                cwd=str(BASE_DIR)
+            )
+            
+            if result.returncode != 0:
+                print(f"  -> ERROR: {name} failed.")
+                print(result.stderr)
+                continue
+                
+            # Parse run_id from stdout
+            # Expecting line: INFO: Starting run <run_id> (Arch: ...)
+            run_id = None
+            for line in result.stdout.split('\n'):
+                if "INFO: Starting run " in line:
+                    parts = line.split("INFO: Starting run ")[1]
+                    run_id = parts.split(" ")[0]
+                    break
+                    
+            if run_id:
+                print(f"  -> Success. Run ID: {run_id}")
+                run_log_info.append((BASE_DIR / "logs" / "runs" / run_id, base_name))
+            else:
+                print(f"  -> Warning: Could not parse run_id for {name}")
             
     # Step 2: Parse all metrics and generate summary CSV
     print("\nBatch execution complete. Parsing metrics...")
@@ -145,14 +151,22 @@ def run_batch():
     
     parser_path = BASE_DIR / "parser" / "metrics_parser.py"
     
-    for log_dir in run_log_dirs:
+    for log_dir, r_name in run_log_info:
         subprocess.run(
-            ["python", str(parser_path), "--log_dir", str(log_dir), "--output_csv", str(summary_csv_path)],
+            ["python", str(parser_path), "--log_dir", str(log_dir), "--output_csv", str(summary_csv_path), "--run_name", r_name],
             capture_output=True,
             cwd=str(BASE_DIR)
         )
         
     print(f"Batch summary generated at: {summary_csv_path}")
+    
+    print("\nGenerating report...")
+    report_script_path = BASE_DIR / "reports" / "generate_summary.py"
+    subprocess.run(
+        ["python", str(report_script_path), "--batch_dir", str(batch_dir)],
+        cwd=str(BASE_DIR)
+    )
+    print("Batch execution and reporting completed.")
 
 if __name__ == "__main__":
     run_batch()
