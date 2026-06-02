@@ -3,6 +3,7 @@ from core.config import GlobalConfig
 from core.logger import StructuredLogger
 from workloads.task_a import TaskAAdapter
 from workloads.task_b import TaskBAdapter
+from core.failure_injection import get_effective_latency, check_crash
 
 def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_id: str):
     """
@@ -10,7 +11,6 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
     All processing happens sequentially in a single process.
     """
     task_type = config.experiment.task_type
-    latency_sec = config.simulation.mock_inference_latency_ms / 1000.0
 
     if task_type == "A":
         # Map-Reduce
@@ -19,22 +19,29 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
         
         results = []
         worker_id = "mono-worker-1"
+        latency_sec = get_effective_latency(config, worker_id)
         
         for chunk in chunks:
             chunk_task_id = f"{run_id}-{chunk['chunk_id']}"
             
-            # Start inference
-            logger.inference_start(trace_id, "monolithic", chunk_task_id, worker_id)
-            
-            # Simulate work
-            if latency_sec > 0:
-                time.sleep(latency_sec)
+            try:
+                # Crash check
+                check_crash(config, worker_id, logger, trace_id, "monolithic", chunk_task_id)
                 
-            res = adapter.process_chunk(chunk)
-            results.append(res)
-            
-            # End inference
-            logger.inference_end(trace_id, "monolithic", chunk_task_id, worker_id, config.simulation.mock_inference_latency_ms)
+                # Start inference
+                logger.inference_start(trace_id, "monolithic", chunk_task_id, worker_id)
+                
+                # Simulate work
+                if latency_sec > 0:
+                    time.sleep(latency_sec)
+                    
+                res = adapter.process_chunk(chunk)
+                results.append(res)
+                
+                # End inference
+                logger.inference_end(trace_id, "monolithic", chunk_task_id, worker_id, config.simulation.mock_inference_latency_ms)
+            except CrashSimulationError:
+                continue
             
         # Aggregation
         # Using correct manual event logging for aggregation since we don't have helper
@@ -50,22 +57,29 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
         adapter = TaskBAdapter(total_steps=config.workload.chunk_count)
         state = adapter.create_initial_state("dummy_query")
         worker_id = "mono-worker-1"
+        latency_sec = get_effective_latency(config, worker_id)
         
         while not state["is_complete"]:
             step_id = state["current_step"]
             step_task_id = f"{run_id}-step-{step_id}"
             
-            # Start inference
-            logger.inference_start(trace_id, "monolithic", step_task_id, worker_id)
-            
-            # Simulate work
-            if latency_sec > 0:
-                time.sleep(latency_sec)
+            try:
+                # Crash check
+                check_crash(config, worker_id, logger, trace_id, "monolithic", step_task_id)
                 
-            state = adapter.process_step(state)
-            
-            # End inference
-            logger.inference_end(trace_id, "monolithic", step_task_id, worker_id, config.simulation.mock_inference_latency_ms)
+                # Start inference
+                logger.inference_start(trace_id, "monolithic", step_task_id, worker_id)
+                
+                # Simulate work
+                if latency_sec > 0:
+                    time.sleep(latency_sec)
+                    
+                state = adapter.process_step(state)
+                
+                # End inference
+                logger.inference_end(trace_id, "monolithic", step_task_id, worker_id, config.simulation.mock_inference_latency_ms)
+            except CrashSimulationError:
+                break
             
     else:
         raise ValueError(f"Unknown task_type: {task_type}")

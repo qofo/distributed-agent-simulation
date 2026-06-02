@@ -5,12 +5,16 @@ from core.logger import StructuredLogger
 from workloads.task_a import TaskAAdapter
 from workloads.task_b import TaskBAdapter
 from core.log_schema import LogEvent, EventType
+from core.failure_injection import get_effective_latency, check_crash, CrashSimulationError
 
 def worker_task_a(chunk, adapter, config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_id: str, worker_id: str):
     chunk_task_id = f"{run_id}-{chunk['chunk_id']}"
-    latency_sec = config.simulation.mock_inference_latency_ms / 1000.0
+    latency_sec = get_effective_latency(config, worker_id)
 
     logger.dequeued(trace_id, "master_worker", chunk_task_id, worker_id)
+    
+    check_crash(config, worker_id, logger, trace_id, "master_worker", chunk_task_id)
+    
     logger.inference_start(trace_id, "master_worker", chunk_task_id, worker_id)
     
     if latency_sec > 0:
@@ -24,9 +28,12 @@ def worker_task_a(chunk, adapter, config: GlobalConfig, logger: StructuredLogger
 def worker_task_b(state, adapter, config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_id: str, worker_id: str):
     step_id = state["current_step"]
     step_task_id = f"{run_id}-step-{step_id}"
-    latency_sec = config.simulation.mock_inference_latency_ms / 1000.0
+    latency_sec = get_effective_latency(config, worker_id)
 
     logger.dequeued(trace_id, "master_worker", step_task_id, worker_id)
+    
+    check_crash(config, worker_id, logger, trace_id, "master_worker", step_task_id)
+    
     logger.inference_start(trace_id, "master_worker", step_task_id, worker_id)
     
     if latency_sec > 0:
@@ -64,7 +71,10 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                 futures.append(executor.submit(worker_task_a, chunk, adapter, config, logger, run_id, trace_id, worker_id))
             
             for future in concurrent.futures.as_completed(futures):
-                results.append(future.result())
+                try:
+                    results.append(future.result())
+                except CrashSimulationError:
+                    pass  # Crashed worker's result is skipped
 
         # Aggregation
         logger.log_event(LogEvent(trace_id=trace_id, architecture="master_worker", task_id="aggregation", event_type=EventType.AGGREGATION_START, worker_id=master_id))
@@ -87,7 +97,10 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                 
                 worker_id = f"mw-worker-{(step_counter % worker_count) + 1}"
                 future = executor.submit(worker_task_b, state, adapter, config, logger, run_id, trace_id, worker_id)
-                state = future.result()
+                try:
+                    state = future.result()
+                except CrashSimulationError:
+                    break  # Stop chain on crash
                 
                 # Master logs handoff overhead optionally, or we consider handoff time as part of queue time.
                 if not state["is_complete"]:

@@ -9,6 +9,7 @@ from core.logger import StructuredLogger
 from workloads.task_a import TaskAAdapter
 from workloads.task_b import TaskBAdapter
 from core.log_schema import LogEvent, EventType
+from core.failure_injection import get_effective_latency, check_crash, CrashSimulationError
 
 class MessageBroker:
     """
@@ -19,7 +20,7 @@ class MessageBroker:
         self.result_queue = queue.Queue()
 
 def queue_worker_loop(broker: MessageBroker, worker_id: str, config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_id: str, stop_event: threading.Event):
-    latency_sec = config.simulation.mock_inference_latency_ms / 1000.0
+    latency_sec = get_effective_latency(config, worker_id)
     task_type = config.experiment.task_type
     
     adapter_a = TaskAAdapter(chunk_count=config.workload.chunk_count)
@@ -33,6 +34,13 @@ def queue_worker_loop(broker: MessageBroker, worker_id: str, config: GlobalConfi
             
         task_id = msg.get("task_id")
         logger.dequeued(trace_id, "queue_based", task_id, worker_id)
+        
+        try:
+            check_crash(config, worker_id, logger, trace_id, "queue_based", task_id)
+        except CrashSimulationError:
+            broker.task_queue.task_done()
+            continue
+        
         logger.inference_start(trace_id, "queue_based", task_id, worker_id)
         
         if latency_sec > 0:
@@ -91,9 +99,12 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
         results = []
         # Wait for results
         for _ in chunks:
-            res_msg = broker.result_queue.get()
-            results.append(res_msg["result"])
-            broker.result_queue.task_done()
+            try:
+                res_msg = broker.result_queue.get(timeout=2.0)
+                results.append(res_msg["result"])
+                broker.result_queue.task_done()
+            except queue.Empty:
+                pass  # Crashed chunk
             
         logger.log_event(LogEvent(trace_id=trace_id, architecture="queue_based", task_id="aggregation", event_type=EventType.AGGREGATION_START, worker_id=orchestrator_id))
         final_result = adapter.aggregate(results)
@@ -108,9 +119,12 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
         logger.queued(trace_id, "queue_based", step_task_id)
         
         # Wait for the single final result
-        res_msg = broker.result_queue.get()
-        final_result = res_msg["result"]
-        broker.result_queue.task_done()
+        try:
+            res_msg = broker.result_queue.get(timeout=2.0)
+            final_result = res_msg["result"]
+            broker.result_queue.task_done()
+        except queue.Empty:
+            final_result = None  # Chain failed
         
     else:
         stop_event.set()
