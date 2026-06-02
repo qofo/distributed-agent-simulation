@@ -37,11 +37,30 @@ MATRIX = [
     {"arch": "master_worker", "task": "A", "workers": 4, "chunks": 20, "latency": 50},
     {"arch": "queue_based", "task": "A", "workers": 2, "chunks": 20, "latency": 50},
     {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 50},
+    {"arch": "queue_based", "task": "A", "workers": 8, "chunks": 20, "latency": 50}, # Scalability limit test
     
     # Task B (Multi-hop QA)
     {"arch": "monolithic", "task": "B", "workers": 1, "chunks": 5, "latency": 100},
     {"arch": "master_worker", "task": "B", "workers": 2, "chunks": 5, "latency": 100},
     {"arch": "queue_based", "task": "B", "workers": 2, "chunks": 5, "latency": 100},
+    
+    # Straggler (Failure Injection) - Task A (Diverse Delays)
+    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 50, "straggler_target": "queue-worker-1", "straggler_delay": 100},
+    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 50, "straggler_target": "queue-worker-1", "straggler_delay": 500},
+    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 50, "straggler_target": "queue-worker-1", "straggler_delay": 1000},
+    
+    # Straggler (Failure Injection) - Task B
+    {"arch": "master_worker", "task": "B", "workers": 2, "chunks": 5, "latency": 100, "straggler_target": "mw-worker-1", "straggler_delay": 500},
+    {"arch": "queue_based", "task": "B", "workers": 2, "chunks": 5, "latency": 100, "straggler_target": "queue-worker-1", "straggler_delay": 500},
+    
+    # Swarm
+    {"arch": "swarm", "task": "A", "workers": 4, "chunks": 20, "latency": 50},
+    {"arch": "swarm", "task": "B", "workers": 2, "chunks": 5, "latency": 100},
+    {"arch": "swarm", "task": "A", "workers": 8, "chunks": 20, "latency": 50}, # Swarm Scalability
+    
+    # Crash (Failure Injection) - Task A
+    {"arch": "master_worker", "task": "A", "workers": 4, "chunks": 20, "latency": 50, "crash_target": "mw-worker-1"},
+    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 50, "crash_target": "queue-worker-1"},
 ]
 
 def run_batch():
@@ -72,6 +91,18 @@ def run_batch():
         cfg["experiment"]["worker_count"] = workers
         cfg["workload"]["chunk_count"] = params["chunks"]
         cfg["simulation"]["mock_inference_latency_ms"] = params["latency"]
+        
+        if "straggler_target" in params:
+            name += "_straggler"
+            cfg["experiment"]["name"] = name
+            cfg["failure_injection"]["mode"] = "straggler"
+            cfg["failure_injection"]["target_worker_id"] = params["straggler_target"]
+            cfg["failure_injection"]["straggler_delay_ms"] = params.get("straggler_delay", 500)
+        elif "crash_target" in params:
+            name += "_crash"
+            cfg["experiment"]["name"] = name
+            cfg["failure_injection"]["mode"] = "crash"
+            cfg["failure_injection"]["target_worker_id"] = params["crash_target"]
         
         cfg_path = temp_configs_dir / f"{name}.yaml"
         with open(cfg_path, "w", encoding="utf-8") as f:
