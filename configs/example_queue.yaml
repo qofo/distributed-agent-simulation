@@ -1,0 +1,22 @@
+experiment:
+  name: "queue_based_run_a"
+  architecture: "queue_based" 
+  worker_count: 4
+  task_type: "A" 
+
+workload:
+  chunk_count: 10
+  dataset_path: "./data/dummy_task_a.json"
+
+simulation:
+  mock_inference_latency_ms: 100
+  timeout_threshold_ms: 5000
+  retry_policy:
+    enabled: true
+    max_retries: 3
+
+failure_injection:
+  mode: "none"
+  target_worker_id: null
+  timing_ms: 0
+  straggler_delay_ms: 0
