@@ -1,56 +1,105 @@
-# LLM 기반 멀티 에이전트 시스템을 위한 분산 아키텍처 비교 시뮬레이션
-**Comparative Simulation of Distributed Architectures for LLM-based Multi-Agent Systems**
+# LLM 기반 멀티 에이전트 시스템을 위한 분산 아키텍처 대규모 시뮬레이션 및 결함 내성 분석
+**Comparative Simulation of Distributed Architectures for LLM-based Multi-Agent Systems: Scalability and Fault Tolerance**
+
+---
 
 ## 1. 서론 (Introduction)
 
-최근 대규모 언어 모델(LLM)의 발전과 함께 복잡한 문제를 분할하여 해결하기 위해 여러 에이전트를 결합하는 멀티 에이전트 시스템(Multi-Agent System) 연구가 활발히 진행되고 있다. 그러나 에이전트 간의 상호작용이 복잡해질수록 단일 프로세스 기반의 순차적 처리 방식(Monolithic)은 심각한 병목 현상을 유발하며, 이는 전체 시스템의 성능 및 응답성 저하로 직결된다.
-
-본 연구의 목적은 에이전트 워크로드의 특성(독립 병렬성 vs. 순차 의존성)에 가장 적합한 분산 아키텍처를 정량적으로 도출하는 것이다. 이를 위해 Monolithic, Master-Worker, Queue-Based, Swarm(P2P) 4가지 아키텍처를 시뮬레이션 환경에 구현하고, 현실적인 LLM Jitter(TTFT 및 토큰 생성 속도 변동성)를 반영하여 시스템 병목과 장애(Crash/Straggler) 상황에서의 복원력을 정밀하게 비교 분석한다.
+대규모 언어 모델(LLM)을 활용한 복합 추론 작업이 증가함에 따라, 다수의 에이전트(Agent)가 협업하여 문제를 해결하는 멀티 에이전트 분산 처리 시스템이 필수적으로 요구되고 있다. 
+기존의 순차적(Monolithic) 접근 방식은 병목 현상과 심각한 지연 시간(Latency) 문제를 야기한다. 본 연구는 다양한 워크로드 특성(독립 병렬성 vs 순차 의존성)과 대규모 스케일링(최대 32개 워커) 상황에서 각 분산 아키텍처가 보여주는 처리량(Throughput), 지연 시간(Latency), 통신 오버헤드를 정량적으로 측정한다. 특히, 분산 환경의 핵심 요소인 꼬리 지연(Tail Latency, Straggler) 및 노드 중단(Crash) 발생 시 시스템의 **복원력(Resilience)과 단일 실패 지점(SPOF) 대응 능력**을 집중적으로 분석한다.
 
 ## 2. 실험 환경 및 시스템 아키텍처 (Experimental Setup)
 
-본 실험은 단순한 고정 지연 시간이 아닌, TTFT(Time To First Token)와 토큰 길이 변동성(Jitter)을 모사하는 동적 지연 시간 스케줄러를 적용하여 실제 LLM API 호출 환경을 현실적으로 재현하였다.
+네트워크와 추론 변수를 철저히 통제하기 위해, 고정 지연 시간(50~100ms)을 제공하는 Mock LLM 서버를 활용한 시뮬레이터에서 실험을 수행했다. **특히 이번 연구에서는 최대 32개의 워커(Worker) 노드를 동원하는 대규모 벤치마크 환경을 구축**하여 오버헤드 한계(Asymptote)를 확인했다.
 
-### 2.1 분산 아키텍처 설계
-1. **Monolithic (모놀리식)**: 단일 스레드 내에서 모든 에이전트 작업이 순차적으로 실행되는 기준점(Baseline).
-2. **Master-Worker (마스터-워커)**: 중앙의 오케스트레이터가 다수의 워커 스레드에 작업을 직접 할당(Dispatch)하는 구조. 
-3. **Queue-Based (큐 기반)**: 중앙 메시지 큐(Message Broker)를 통해 생산자와 소비자를 완전히 분리한 느슨한 결합.
-4. **Swarm (스웜/P2P)**: 중앙 오케스트레이터 없이 에이전트 간 정적 라우팅을 기반으로 직접 핸드오프(Handoff)하는 분산망.
+### 2.1 4대 분산 아키텍처 설계
+1. **Monolithic (모놀리식)**: 단일 스레드/프로세스 내에서 순차 처리. 기준점(Baseline) 역할.
+2. **Master-Worker (마스터-워커)**: 중앙 마스터(Orchestrator)가 다수의 워커 스레드에 작업을 직접 디스패치하는 구조.
+3. **Queue-Based (큐 기반)**: 중앙 메시지 브로커(Message Queue)를 통해 태스크를 퍼블리시하고 워커들이 자율적으로 폴링(Polling)하는 느슨한 결합.
+4. **Swarm (스웜/P2P)**: 중앙 통제 없이, 에이전트 간 정적 라우팅에 따라 서로 직접 메시지를 핸드오프(Handoff)하는 탈중앙화 망 구조.
 
 ### 2.2 워크로드 모델링
-* **Task A (Map-Reduce)**: 다수의 청크를 독립적으로 병렬 요약.
-* **Task B (Multi-hop QA)**: 이전 결과가 다음 단계로 이어지는 연쇄적 순차 추론.
-
-## 3. 실험 결과 및 Research Question(RQ) 분석
-
-### RQ01. Linear Scalability: 워커 증설이 선형적 향상으로 이어지는가?
-Task A 병렬 환경에서 워커 수를 1개, 2개, 4개, 8개로 증설하며 선형성을 검증했다. 
-* W=2에서 W=4 구간까지는 처리량(Throughput)이 선형에 가깝게 증가하나, **W=8로 확장 시** Master-Worker와 Queue-Based 구조 모두 중앙 분배 오버헤드와 큐 락(Lock) 경합으로 인해 증가폭이 둔화(Plateau)되는 양상을 보였다.
-* 반면 중앙 병목이 아예 존재하지 않는 **Swarm 아키텍처**는 W=8 환경에서도 거의 완벽한 선형 처리량 확장을 달성하여 대규모 병렬 확장에 가장 적합함을 증명하였다.
-
-### RQ02. Architectural Bottleneck: 병목의 본질적 차이는 무엇인가?
-지표 분석 결과, 분산 처리의 병목은 구조에 따라 명확히 달랐다.
-* **Master-Worker**: `avg_dispatch_overhead`가 주된 병목 원인이다. 워커 수가 늘어날수록 마스터가 각 워커의 상태를 폴링하고 태스크를 직접 할당하는 시간 지연이 누적된다.
-* **Queue-Based**: `avg_queue_wait_sec` 지표에서 나타나듯, 메시지를 직렬화하여 큐에 삽입하고 워커가 디큐(Dequeue)를 위해 대기하는 시간이 핵심 오버헤드로 작용한다. 특히 순차적인 Task B 환경에서는 이러한 통신 지연이 모놀리식의 순차 처리 시간보다 더 큰 부담으로 작용함을 확인했다.
-
-### RQ03. Queue Efficiency: 큐 관리 오버헤드가 이득을 상쇄하는 임계점은 어디인가?
-이 질문에 답하기 위해, LLM 추론 지연 시간(TTFT)을 10ms부터 500ms까지 스윕(Sweep)하며 Monolithic(W=1)과 Queue-Based(W=4)의 성능 교차점(Crossover Point)을 측정했다.
-* **결과**: 추론 지연 시간이 극단적으로 짧은 구간(예: 10~20ms)에서는 워커를 4개 동원하여 병렬 처리하더라도, **큐를 거치는 통신 오버헤드(Queue Wait Time)가 더 커서 오히려 Monolithic보다 총 소요 시간이 느려지는 현상**이 나타났다.
-* **결론**: 분산 큐 아키텍처는 개별 태스크의 처리 시간이 특정 임계점(본 실험 기준 50ms 근방)을 초과할 때부터 비로소 병렬화의 이득이 오버헤드를 압도한다. *(첨부: `latency_sweep_crossover.png` 참조)*
-
-### RQ04. Fault Tolerance: 노드 장애 발생 시 꼬리 지연(Tail Latency) 변화는?
-현실적인 서비스 장애를 모사하기 위해 Straggler(지연)를 100ms, 500ms, 1000ms 등 다양하게 주입하여 분석했다.
-* **Straggler 방어력**: 한 워커에 심각한 지연이 발생할 경우, Master-Worker 구조는 해당 워커에 할당된 몫만큼 전체 시스템의 P99 지연 시간이 급증한다. 반면 Queue-Based 구조는 놀고 있는 정상 워커가 큐에서 선착순으로 남은 태스크를 가져가는 '자동 로드 밸런싱' 효과로 인해 **꼬리 지연 증가를 획기적으로 방어**해냈다.
-* **Crash (중단)**: 워커가 예기치 않게 종료되는 상황에서, 타임아웃/재시도 룰이 없는 순수 Queue-Based 모델은 큐잉 락이 걸리며 시스템 교착(34초 대기)을 유발했다. 반면 Master-Worker는 스레드 예외를 포착하고 즉각 에러 렌더링으로 넘어가 복원성을 보였다. 
-
-## 4. 결론 (Conclusion)
-
-본 연구의 시뮬레이션을 통해 멀티 에이전트 시스템을 위한 4가지 아키텍처의 트레이드오프(Trade-off)를 정량적으로 도출하였다.
-
-1. **병렬 연산 규모 확장**: 확장 한계(Plateau)를 뛰어넘기 위해서는 중앙 제어가 없는 Swarm 구조 도입이 필수적이다.
-2. **지연 시간(Latency) 최적화**: 개별 에이전트의 추론 시간이 짧고 상호 의존적인 작업(Task B)에서는 Monolithic 단일 묶음 처리가 통신 오버헤드를 없애는 가장 빠른 방법이다.
-3. **운영 안정성 보장**: 트래픽 스파이크나 일부 노드 지연(Straggler)이 빈번한 클라우드 환경에서는 Queue-Based 아키텍처의 비동기 로드 밸런싱이 강력한 무기가 되나, Crash 대응을 위해 반드시 정교한 Timeout 메커니즘을 동반해야 한다.
+* **Task A (Map-Reduce)**: 문서를 다수의 청크(Chunk=10)로 분할하여 독립적으로 처리 후 집계하는 극대화된 병렬 태스크.
+* **Task B (Multi-hop QA)**: 이전 단계의 추론 결과가 다음 단계의 입력이 되는 연쇄적인 순차 의존 태스크.
 
 ---
-**[AI 활용 명시]** 
-본 연구의 실험 시스템(Mock API 서버, Event-Sourcing Logger, 분산 Executor 프레임워크) 구현 및 가변 토큰(TTFT Jitter) 모사 스케줄러, 지연 시간 스윕(Sweep) 분석 자동화 과정 전반에 걸쳐 Gemini AI 코딩 어시스턴트의 고도화된 페어 프로그래밍을 활용하여 신뢰도 높은 데이터를 단기간에 도출하였음을 밝힌다.
+
+## 3. 실험 결과 및 분석 (Evaluation & Analysis)
+
+총 25개의 세부 튜닝된 환경(다양한 워커 수 및 장애 시나리오)에 대해 각 3회의 앙상블 테스트(Iteration)를 수행했다.
+
+### 3.1 독립 병렬 워크로드 (Task A) 확장성 분석
+
+병렬 처리가 극대화되는 Task A 환경에서 워커 수(W)를 4, 16, 32개로 늘려가며 스케일 업(Scale-up) 성능을 측정했다.
+
+| Architecture | Throughput (Req/sec) | P50 Latency (sec) | Queue Wait (sec) |
+| :--- | ---: | ---: | ---: |
+| **Monolithic (W=1)** | 4.57 | 1.270 | 0.000 |
+| **Master-Worker (W=4)** | 7.73 | 0.326 | 0.122 |
+| **Master-Worker (W=32)** | 9.79 | 0.078 | 0.001 |
+| **Queue-Based (W=4)** | 7.39 | 0.418 | 0.119 |
+| **Queue-Based (W=32)** | 8.71 | 0.183 | 0.000 |
+| **Swarm (W=4)** | 9.81 | **0.078** | 0.000 |
+| **Swarm (W=32)** | **9.77** | **0.080** | 0.000 |
+
+**분석 포인트 1: Swarm의 압도적 효율성**
+Swarm 아키텍처는 에이전트 간 직접 핸드오프로 인해 중앙 병목이 없어, W=4의 적은 워커로도 이미 시스템 한계 처리량(약 9.8 Req/sec)에 도달하며 0.078초의 최단 지연 시간을 달성했다.
+반면 Master-Worker와 Queue-Based는 워커가 32개까지 늘어난 후에야 Swarm의 초기 성능에 근접했다. 대규모 스레딩 오버헤드와 큐잉/디큐잉 락(Lock) 경합으로 인해 Queue-Based(W=32)는 여전히 0.18초의 지연 시간을 보였다.
+
+> **그래프 참조**: [Throughput Chart (report2/throughput.png)](file:///c:/Users/BRAIN/Desktop/distributed-agent-simulation/report2/throughput.png)
+> **그래프 참조**: [Latency Chart (report2/latency.png)](file:///c:/Users/BRAIN/Desktop/distributed-agent-simulation/report2/latency.png)
+
+---
+
+### 3.2 순차 의존성 워크로드 (Task B) 통신 오버헤드 분석
+
+각 에이전트의 출력이 다음 에이전트의 입력으로 묶여 있어 병렬화가 불가능한 Task B(Multi-hop)의 결과이다.
+
+| Architecture (W=2) | Throughput (Req/sec) | P50 Latency (sec) | 통신/큐 대기 시간 |
+| :--- | ---: | ---: | ---: |
+| Monolithic (W=1) | 6.86 | 0.532 | 0.000 |
+| Master-Worker | 6.62 | 0.560 | 0.000 |
+| **Queue-Based** | **6.27** | **0.644** | **누적 증가** |
+| Swarm | 6.67 | 0.549 | 0.000 |
+
+**분석 포인트 2: 메시지 큐의 태생적 딜레이**
+작업이 순차적으로 이루어짐에 따라, 큐 기반 구조는 "결과 반환 -> 큐잉 -> 디큐잉 -> 다음 워커 실행"의 오버헤드를 모든 Step에서 반복해서 겪는다. 이로 인해 큐 기반 구조만 유일하게 Monolithic 보다 지연 시간이 20% 가까이 증가했다.
+
+> **그래프 참조**: [Overhead Chart (report2/overhead_task_b.png)](file:///c:/Users/BRAIN/Desktop/distributed-agent-simulation/report2/overhead_task_b.png)
+
+---
+
+## 4. 장애 내성 및 복원력 (Failure Injection Model)
+
+### 4.1 꼬리 지연 (Straggler) 효과와 로드 밸런싱
+특정 노드에 고의적으로 500ms의 네트워크 딜레이를 발생시킨 결과:
+* **Task A (병렬)**: Queue-Based 구조는 Straggler(500ms) 발생 시 전체 지연이 `0.67초`로 억제되었다. 큐를 통한 자연스러운 **로드 밸런싱(Idle 노드가 작업을 먼저 채감)** 덕분에 느린 노드의 악영향이 분산되었음을 증명한다. 지연을 `1000ms`로 극단적으로 늘렸을 때도 지연은 `1.16초`에 불과했다.
+* **Task B (순차)**: 순차적 파이프라인에서 Straggler를 만나면 전체 시스템이 병목에 걸리며 Master-Worker 및 Queue-Based 모두 `2.0초`대까지 지연이 크게 폭증(Tail Latency Amplification)했다.
+
+### 4.2 SPOF 및 노드 중단 (Crash Resilience) 메커니즘
+무작위 워커 및 마스터 노드에 Crash 주입 시뮬레이션을 수행했다.
+
+| Architecture | Crash 주입 시 평균 P50 Latency (sec) | 시스템 교착(Deadlock) 여부 |
+| :--- | :--- | :--- |
+| **Master-Worker** | 0.081 | 안전 (부분 결함 시 스킵 / 마스터 장애 시 즉시 실패) |
+| **Queue-Based (개선 전)** | 34.00+ | **무한 루프(Infinite Re-queue) 및 시스템 마비** |
+| **Queue-Based (개선 후)** | **2.580** | **Dead Letter Queue Timeout 후 복원 완료** |
+
+**분석 포인트 3: 큐 기반 구조의 치명적 결함과 복원(Resilience)**
+초기 Queue-Based 구조에서는 워커가 예외로 인해 죽을 시 잃어버린 작업을 오케스트레이터가 회수하지 못하거나 무한 루프(Infinite Loop)에 빠져 시스템 전체가 먹통이 되는 치명적인 결함이 존재했다. 
+이를 2.0초의 타임아웃 감지 및 **안전한 태스크 ID 기반 Re-queue 메커니즘**으로 개선한 결과, 장애 발생 시 정확히 `2.58초(Timeout 대기 2초 + 재처리 0.5초)` 만에 살아남은 다른 워커들이 작업을 성공적으로 인수하여 시스템을 정상 복구해 내는 뛰어난 복원력(Resilience)을 증명하였다.
+
+---
+
+## 5. 결론 (Conclusion)
+
+본 시뮬레이션은 LLM 멀티 에이전트 환경에서 각 아키텍처의 강점과 약점을 명확히 보여준다.
+1. **극강의 성능과 오버헤드 최소화**: 중앙 관제에 얽매이지 않는 **Swarm(P2P) 구조**가 압도적으로 높은 성능을 보인다.
+2. **높은 유연성과 내결함성**: **Queue-Based 아키텍처**는 타임아웃 및 재시도(Retry) 설계가 잘 갖춰져 있다면 Straggler 억제와 크래시 자동 복구(Auto-healing)에 가장 이상적인 구조이다.
+3. **순차 작업의 주의점**: 의존성이 강한 Chain 형태의 워크로드에서는 잦은 큐잉과 네트워크 통신 오버헤드를 극도로 경계해야 한다.
+
+향후 연구에서는 정적 라우팅을 넘어선 동적 디스커버리(Dynamic Discovery)를 적용한 Swarm 아키텍처 고도화를 진행할 예정이다.
+
+---
+**[AI Collaboration Note]**
+본 논문의 설계, 결함 분석(Bug Tracking), 그리고 대규모 분산 오버헤드 픽스는 Gemini Advanced와의 고도의 Pair-Programming을 통해 작성 및 검증되었음을 명시한다.
