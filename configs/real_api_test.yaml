@@ -1,0 +1,22 @@
+experiment:
+  architecture: "queue_based"
+  task_type: "A"
+  worker_count: 2
+
+workload:
+  chunk_count: 3
+  dataset_path: "./data/real_dataset_a.txt"
+  total_requests: 1
+  requests_per_second: 1.0
+
+simulation:
+  mock_inference_latency_ms: 0
+  timeout_threshold_ms: 60000
+  retry_policy:
+    max_retries: 3
+    base_delay_ms: 1000
+
+failure_injection:
+  mode: "none"
+  target_worker_id: ""
+  straggler_delay_ms: 0
