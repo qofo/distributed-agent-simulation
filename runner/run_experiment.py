@@ -36,10 +36,12 @@ async def run_single_request(run_func, config: GlobalConfig, logger: StructuredL
     trace_id = f"sys-{run_id}-req-{req_index}"
     logger.task_received(trace_id, config.experiment.architecture, "request-init", {"req_index": req_index})
     
-    # Execute the architecture block synchronously in a thread
-    await asyncio.to_thread(run_func, config, logger, run_id, trace_id)
-    
-    logger.task_completed(trace_id, config.experiment.architecture, "request-finish", {"status": "success"})
+    try:
+        # Execute the architecture block synchronously in a thread
+        await asyncio.to_thread(run_func, config, logger, run_id, trace_id)
+        logger.task_completed(trace_id, config.experiment.architecture, "request-finish", {"status": "success"})
+    except Exception as e:
+        logger.task_completed(trace_id, config.experiment.architecture, "request-finish", {"status": "failed", "reason": str(e)})
 
 async def execute_all_requests(run_func, config: GlobalConfig, logger: StructuredLogger, run_id: str):
     total_requests = config.workload.total_requests
@@ -97,7 +99,20 @@ def main():
         
         print(f"[{datetime.now().isoformat()}] INFO: Starting run {run_id} (Arch: {config.experiment.architecture}, Requests: {config.workload.total_requests})")
         
-        # 6. Execute architecture logic
+        # 6. Randomize crash target if needed
+        if config.failure_injection.mode == "crash" and config.failure_injection.target_worker_id == "random":
+            import random
+            targets = []
+            if config.experiment.architecture == "master_worker":
+                targets = ["master-node"] + [f"mw-worker-{i+1}" for i in range(config.experiment.worker_count)]
+            elif config.experiment.architecture == "queue_based":
+                targets = ["orchestrator"] + [f"queue-worker-{i+1}" for i in range(config.experiment.worker_count)]
+            
+            if targets:
+                config.failure_injection.target_worker_id = random.choice(targets)
+                print(f"[{datetime.now().isoformat()}] INFO: Random crash target selected: {config.failure_injection.target_worker_id}")
+        
+        # 7. Execute architecture logic
         run_func = None
         if config.experiment.architecture == "monolithic":
             from architectures.monolithic.executor import execute as run_monolithic

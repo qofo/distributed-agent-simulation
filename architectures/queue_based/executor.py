@@ -38,8 +38,8 @@ def queue_worker_loop(broker: MessageBroker, worker_id: str, config: GlobalConfi
         try:
             check_crash(config, worker_id, logger, trace_id, "queue_based", task_id)
         except CrashSimulationError:
-            broker.task_queue.task_done()
-            continue
+            # Worker dies completely on crash, chunk is dropped
+            break
         
         logger.inference_start(trace_id, "queue_based", task_id, worker_id)
         
@@ -87,6 +87,9 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
     orchestrator_id = "orchestrator"
     logger.log_event(LogEvent(trace_id=trace_id, architecture="queue_based", task_id="orchestrator-init", event_type=EventType.TASK_RECEIVED, worker_id=orchestrator_id))
     
+    # Check if orchestrator crashes (SPOF)
+    check_crash(config, orchestrator_id, logger, trace_id, "queue_based", "orchestrator-init")
+    
     if task_type == "A":
         adapter = TaskAAdapter(chunk_count=config.workload.chunk_count)
         chunks = adapter.split("dummy_input_data")
@@ -97,14 +100,29 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
             logger.queued(trace_id, "queue_based", chunk_task_id)
             
         results = []
-        # Wait for results
-        for _ in chunks:
+        pending_chunks = {f"{run_id}-{chunk['chunk_id']}": chunk for chunk in chunks}
+        
+        # Wait for results and retry on timeout
+        while pending_chunks:
+            # Check if all workers are dead
+            if not any(w.is_alive() for w in workers):
+                logger.log_event(LogEvent(trace_id=trace_id, architecture="queue_based", task_id="orchestrator-fail", event_type=EventType.TASK_COMPLETED, worker_id=orchestrator_id, details={"status": "failed", "reason": "All workers crashed"}))
+                raise CrashSimulationError("All workers crashed")
+                
             try:
                 res_msg = broker.result_queue.get(timeout=2.0)
                 results.append(res_msg["result"])
+                
+                # Pop by exact task_id
+                task_id_val = res_msg["task_id"]
+                pending_chunks.pop(task_id_val, None)
+                
                 broker.result_queue.task_done()
             except queue.Empty:
-                pass  # Crashed chunk
+                # Timeout occurred! Re-queue the pending chunks to simulate Dead Letter Queue retry
+                for chunk_task_id, chunk in pending_chunks.items():
+                    broker.task_queue.put({"task_id": chunk_task_id, "payload": chunk})
+                    logger.queued(trace_id, "queue_based", f"{chunk_task_id}-retry")
             
         logger.log_event(LogEvent(trace_id=trace_id, architecture="queue_based", task_id="aggregation", event_type=EventType.AGGREGATION_START, worker_id=orchestrator_id))
         final_result = adapter.aggregate(results)

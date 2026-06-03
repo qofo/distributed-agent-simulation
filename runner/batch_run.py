@@ -16,7 +16,7 @@ CONFIG_TEMPLATE = {
     "workload": {
         "chunk_count": 10,
         "dataset_path": "./data/dummy.json",
-        "total_requests": 30,
+        "total_requests": 10,
         "requests_per_second": 10.0
     },
     "simulation": {
@@ -37,14 +37,23 @@ MATRIX = [
     {"arch": "monolithic", "task": "A", "workers": 1, "chunks": 20, "latency": 50},
     {"arch": "master_worker", "task": "A", "workers": 2, "chunks": 20, "latency": 50},
     {"arch": "master_worker", "task": "A", "workers": 4, "chunks": 20, "latency": 50},
+    {"arch": "master_worker", "task": "A", "workers": 16, "chunks": 20, "latency": 50},
+    {"arch": "master_worker", "task": "A", "workers": 32, "chunks": 20, "latency": 50},
     {"arch": "queue_based", "task": "A", "workers": 2, "chunks": 20, "latency": 50},
     {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 50},
-    {"arch": "queue_based", "task": "A", "workers": 8, "chunks": 20, "latency": 50}, # Scalability limit test
+    {"arch": "queue_based", "task": "A", "workers": 8, "chunks": 20, "latency": 50},
+    {"arch": "queue_based", "task": "A", "workers": 16, "chunks": 20, "latency": 50},
+    {"arch": "queue_based", "task": "A", "workers": 32, "chunks": 20, "latency": 50},
+    {"arch": "swarm", "task": "A", "workers": 4, "chunks": 20, "latency": 50},
+    {"arch": "swarm", "task": "A", "workers": 8, "chunks": 20, "latency": 50},
+    {"arch": "swarm", "task": "A", "workers": 16, "chunks": 20, "latency": 50},
+    {"arch": "swarm", "task": "A", "workers": 32, "chunks": 20, "latency": 50},
     
     # Task B (Multi-hop QA)
     {"arch": "monolithic", "task": "B", "workers": 1, "chunks": 5, "latency": 100},
     {"arch": "master_worker", "task": "B", "workers": 2, "chunks": 5, "latency": 100},
     {"arch": "queue_based", "task": "B", "workers": 2, "chunks": 5, "latency": 100},
+    {"arch": "swarm", "task": "B", "workers": 2, "chunks": 5, "latency": 100},
     
     # Straggler (Failure Injection) - Task A (Diverse Delays)
     {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 50, "straggler_target": "queue-worker-1", "straggler_delay": 100},
@@ -55,14 +64,9 @@ MATRIX = [
     {"arch": "master_worker", "task": "B", "workers": 2, "chunks": 5, "latency": 100, "straggler_target": "mw-worker-1", "straggler_delay": 500},
     {"arch": "queue_based", "task": "B", "workers": 2, "chunks": 5, "latency": 100, "straggler_target": "queue-worker-1", "straggler_delay": 500},
     
-    # Swarm
-    {"arch": "swarm", "task": "A", "workers": 4, "chunks": 20, "latency": 50},
-    {"arch": "swarm", "task": "B", "workers": 2, "chunks": 5, "latency": 100},
-    {"arch": "swarm", "task": "A", "workers": 8, "chunks": 20, "latency": 50}, # Swarm Scalability
-    
-    # Crash (Failure Injection) - Task A
-    {"arch": "master_worker", "task": "A", "workers": 4, "chunks": 20, "latency": 50, "crash_target": "mw-worker-1"},
-    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 50, "crash_target": "queue-worker-1"},
+    # Crash (Failure Injection) - Task A (target set to 'random' to include master)
+    {"arch": "master_worker", "task": "A", "workers": 4, "chunks": 20, "latency": 50, "crash_target": "random"},
+    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 50, "crash_target": "random"},
 ]
 
 def run_batch():
@@ -163,7 +167,7 @@ def run_batch():
     print("\nGenerating report...")
     report_script_path = BASE_DIR / "reports" / "generate_summary.py"
     subprocess.run(
-        ["python", str(report_script_path), "--batch_dir", str(batch_dir)],
+        ["python", str(report_script_path), "--batch_dir", str(batch_dir), "--output_dir", "report2"],
         cwd=str(BASE_DIR)
     )
     print("Batch execution and reporting completed.")

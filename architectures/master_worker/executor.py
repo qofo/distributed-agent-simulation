@@ -60,6 +60,9 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
         master_id = "master-node"
         logger.log_event(LogEvent(trace_id=trace_id, architecture="master_worker", task_id="master-dispatch", event_type=EventType.TASK_RECEIVED, worker_id=master_id))
         
+        # Check if master crashes (SPOF)
+        check_crash(config, master_id, logger, trace_id, "master_worker", "master-dispatch")
+        
         results = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count) as executor:
             futures = []
@@ -87,6 +90,9 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
         
         master_id = "master-node"
         logger.log_event(LogEvent(trace_id=trace_id, architecture="master_worker", task_id="master-dispatch", event_type=EventType.TASK_RECEIVED, worker_id=master_id))
+        
+        # Check if master crashes (SPOF)
+        check_crash(config, master_id, logger, trace_id, "master_worker", "master-dispatch")
         
         # For chained reasoning, tasks must run sequentially. The master coordinates handoff.
         with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count) as executor:
