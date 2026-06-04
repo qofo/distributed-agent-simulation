@@ -87,7 +87,8 @@ class StructuredLogger:
                          event_type=EventType.DEQUEUED, worker_id=worker_id, details=details or {})
         self.log_event(event)
 
-    def error_crash(self, trace_id: str, architecture: str, task_id: str, worker_id: str, reason: str):
-        event = LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, 
-                         event_type=EventType.CRASH, worker_id=worker_id, details={"reason": reason})
-        self.log_event(event)
+    def crash(self, trace_id: str, architecture: str, task_id: str, worker_id: str, reason: str):
+        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, event_type=EventType.CRASH, worker_id=worker_id, details={"reason": reason}))
+
+    def api_429_error(self, trace_id: str, architecture: str, worker_id: str):
+        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id="api-call", event_type=EventType.API_429_ERROR, worker_id=worker_id))

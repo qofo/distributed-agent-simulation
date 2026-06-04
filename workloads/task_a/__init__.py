@@ -46,7 +46,7 @@ class TaskAAdapter:
             })
         return chunks
 
-    def process_chunk(self, chunk: Dict[str, Any]) -> str:
+    def process_chunk(self, chunk: Dict[str, Any], context: Dict[str, Any] = None) -> str:
         """Processes a single chunk using actual Gemini API."""
         content = chunk["content"]
         if content == "No content":
@@ -59,7 +59,8 @@ class TaskAAdapter:
             contents=prompt,
             config={
                 "system_instruction": "You are a highly efficient summarization AI. Output only the summarized text without any conversational filler."
-            }
+            },
+            context=context
         )
         return response.text.strip()
 

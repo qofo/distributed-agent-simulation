@@ -34,8 +34,8 @@ class TaskBAdapter:
             "is_complete": False
         }
 
-    def process_step(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """Processes one reasoning step using actual Gemini API."""
+    def process_step(self, state: Dict[str, Any], context: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Processes one step in the chain."""
         if state.get("is_complete"):
             return state
 
@@ -57,10 +57,11 @@ Provide a concise and factual statement representing the insight gained in this 
 
         response = generate_content(
             model="gemini-3.1-flash-lite",
-            contents=prompt.strip(),
+            contents=prompt,
             config={
-                "system_instruction": "You are a precise analytical AI performing step-by-step reasoning. Output only the factual insight discovered in this step."
-            }
+                "system_instruction": "You are a multi-hop reasoning agent. Output only a short, direct answer based on the provided context."
+            },
+            context=context
         )
         new_insight = response.text.strip()
         

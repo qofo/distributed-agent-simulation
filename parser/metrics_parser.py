@@ -43,6 +43,10 @@ def compute_metrics(log_file: Path, run_name: str) -> Dict[str, Any]:
     retries = 0
     timeouts = 0
     crashes = 0
+    api_429_errors = 0
+    
+    active_workers = set()
+    max_active_workers = 0
     
     architecture = events[0].get("architecture", "unknown")
 
@@ -73,6 +77,15 @@ def compute_metrics(log_file: Path, run_name: str) -> Dict[str, Any]:
             timeouts += 1
         elif evt_type == "CRASH":
             crashes += 1
+        elif evt_type == "API_429_ERROR":
+            api_429_errors += 1
+            
+        # Active workers tracking
+        if evt_type == "INFERENCE_START" and event.get("worker_id"):
+            active_workers.add(event.get("worker_id"))
+            max_active_workers = max(max_active_workers, len(active_workers))
+        elif evt_type == "INFERENCE_END" and event.get("worker_id"):
+            active_workers.discard(event.get("worker_id"))
 
     # Calculations
     p50_latency = statistics.median(request_latencies) if request_latencies else 0.0
@@ -95,7 +108,9 @@ def compute_metrics(log_file: Path, run_name: str) -> Dict[str, Any]:
         "avg_queue_wait_sec": avg_queue_wait,
         "retries": retries,
         "timeouts": timeouts,
-        "crashes": crashes
+        "crashes": crashes,
+        "api_429_errors": api_429_errors,
+        "max_active_workers": max_active_workers
     }
 
 def write_csv_summary(metrics: Dict[str, Any], output_path: Path):

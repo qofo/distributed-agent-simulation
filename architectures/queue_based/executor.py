@@ -46,13 +46,15 @@ def queue_worker_loop(broker: MessageBroker, worker_id: str, config: GlobalConfi
         if latency_sec > 0:
             time.sleep(latency_sec)
             
+        context = {"logger": logger, "trace_id": trace_id, "architecture": "queue_based", "worker_id": worker_id}
+            
         if task_type == "A":
             chunk = msg.get("payload")
-            res = adapter_a.process_chunk(chunk)
+            res = adapter_a.process_chunk(chunk, context=context)
             broker.result_queue.put({"task_id": task_id, "result": res})
         elif task_type == "B":
             state = msg.get("payload")
-            new_state = adapter_b.process_step(state)
+            new_state = adapter_b.process_step(state, context=context)
             if new_state["is_complete"]:
                 broker.result_queue.put({"task_id": task_id, "result": new_state})
             else:
@@ -111,11 +113,10 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                 
             try:
                 res_msg = broker.result_queue.get(timeout=10.0)
-                results.append(res_msg["result"])
-                
-                # Pop by exact task_id
                 task_id_val = res_msg["task_id"]
-                pending_chunks.pop(task_id_val, None)
+                if task_id_val in pending_chunks:
+                    results.append(res_msg["result"])
+                    pending_chunks.pop(task_id_val)
                 
                 broker.result_queue.task_done()
             except queue.Empty:

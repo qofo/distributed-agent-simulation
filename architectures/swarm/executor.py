@@ -36,7 +36,8 @@ def _agent_process_task_a(chunk, adapter, config, logger, run_id, trace_id, agen
     if latency_sec > 0:
         time.sleep(latency_sec)
 
-    res = adapter.process_chunk(chunk)
+    context = {"logger": logger, "trace_id": trace_id, "architecture": "swarm", "worker_id": agent_id}
+    res = adapter.process_chunk(chunk, context=context)
 
     logger.inference_end(trace_id, "swarm", chunk_task_id, agent_id, config.simulation.mock_inference_latency_ms)
     return res
@@ -71,32 +72,37 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
         def worker_fn(idx, chunk):
             agent_id = routing_table[idx]
             try:
-                results[idx] = _agent_process_task_a(chunk, adapter, config, logger, run_id, trace_id, agent_id)
-            except Exception:
-                results[idx] = None
+                return _agent_process_task_a(chunk, adapter, config, logger, run_id, trace_id, agent_id)
+            except CrashSimulationError as e:
+                raise e
 
-        for i, chunk in enumerate(chunks):
-            chunk_task_id = f"{run_id}-{chunk['chunk_id']}"
-            agent_id = routing_table[i]
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = []
+            for i, chunk in enumerate(chunks):
+                chunk_task_id = f"{run_id}-{chunk['chunk_id']}"
+                agent_id = routing_table[i]
 
-            # 이전 에이전트가 다음 에이전트에게 핸드오프 로그
-            if i > 0:
-                prev_agent = routing_table[i - 1]
-                logger.log_event(LogEvent(
-                    trace_id=trace_id, architecture="swarm",
-                    task_id=f"handoff-chunk-{i}",
-                    event_type=EventType.HANDOFF,
-                    worker_id=prev_agent,
-                    details={"target_agent": agent_id}
-                ))
+                # 이전 에이전트가 다음 에이전트에게 핸드오프 로그
+                if i > 0:
+                    prev_agent = routing_table[i - 1]
+                    logger.log_event(LogEvent(
+                        trace_id=trace_id, architecture="swarm",
+                        task_id=f"handoff-chunk-{i}",
+                        event_type=EventType.HANDOFF,
+                        worker_id=prev_agent,
+                        details={"target_agent": agent_id}
+                    ))
 
-            logger.queued(trace_id, "swarm", chunk_task_id)
-            t = threading.Thread(target=worker_fn, args=(i, chunk))
-            t.start()
-            threads.append(t)
+                logger.queued(trace_id, "swarm", chunk_task_id)
+                futures.append(executor.submit(worker_fn, i, chunk))
 
-        for t in threads:
-            t.join()
+            # 결과를 순서대로 취합 (Crash 발생 시 예외 발생으로 Request 전체 실패)
+            for i, future in enumerate(futures):
+                try:
+                    results[i] = future.result()
+                except CrashSimulationError as e:
+                    raise e
 
         # Aggregation: 마지막 에이전트가 수행
         last_agent = routing_table[len(chunks) - 1]
@@ -142,7 +148,8 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
             if latency_sec > 0:
                 time.sleep(latency_sec)
 
-            state = adapter.process_step(state)
+            context = {"logger": logger, "trace_id": trace_id, "architecture": "swarm", "worker_id": current_agent}
+            state = adapter.process_step(state, context=context)
 
             logger.inference_end(trace_id, "swarm", step_task_id, current_agent, config.simulation.mock_inference_latency_ms)
 

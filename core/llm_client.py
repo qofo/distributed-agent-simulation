@@ -58,13 +58,25 @@ def is_rate_limit_error(exception: Exception) -> bool:
     return False
 
 # Retry on rate limit errors with exponential backoff (up to 5 attempts)
+def log_retry(retry_state):
+    context = retry_state.kwargs.get("context")
+    if context:
+        logger = context.get("logger")
+        if logger:
+            logger.api_429_error(
+                trace_id=context.get("trace_id", "unknown"),
+                architecture=context.get("architecture", "unknown"),
+                worker_id=context.get("worker_id", "unknown")
+            )
+
 @retry(
     retry=retry_if_exception(is_rate_limit_error),
     wait=wait_exponential(multiplier=1, min=4, max=60),
     stop=stop_after_attempt(5),
-    reraise=True
+    reraise=True,
+    before_sleep=log_retry
 )
-def _generate_content_with_backoff(model: str, contents: Any, config: Any = None):
+def _generate_content_with_backoff(model: str, contents: Any, config: Any = None, context: Any = None):
     client = key_manager.get_client()
     try:
         if config:
@@ -78,6 +90,6 @@ def _generate_content_with_backoff(model: str, contents: Any, config: Any = None
             key_manager.rotate_key()
         raise e
 
-def generate_content(model: str, contents: Any, config: Any = None):
+def generate_content(model: str, contents: Any, config: Any = None, context: Any = None):
     """Wrapper to generate content with key rotation and retry logic."""
-    return _generate_content_with_backoff(model, contents, config)
+    return _generate_content_with_backoff(model=model, contents=contents, config=config, context=context)

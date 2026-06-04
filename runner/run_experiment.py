@@ -43,14 +43,19 @@ async def run_single_request(run_func, config: GlobalConfig, logger: StructuredL
     except Exception as e:
         logger.task_completed(trace_id, config.experiment.architecture, "request-finish", {"status": "failed", "reason": str(e)})
 
+async def run_single_request_with_sem(sem, run_func, config, logger, run_id, i):
+    async with sem:
+        await run_single_request(run_func, config, logger, run_id, i)
+
 async def execute_all_requests(run_func, config: GlobalConfig, logger: StructuredLogger, run_id: str):
     total_requests = config.workload.total_requests
     rps = config.workload.requests_per_second
     sleep_interval = 1.0 / rps if rps > 0 else 0
     
+    sem = asyncio.Semaphore(1)
     tasks = []
     for i in range(total_requests):
-        tasks.append(asyncio.create_task(run_single_request(run_func, config, logger, run_id, i)))
+        tasks.append(asyncio.create_task(run_single_request_with_sem(sem, run_func, config, logger, run_id, i)))
         if sleep_interval > 0 and i < total_requests - 1:
             await asyncio.sleep(sleep_interval)
             

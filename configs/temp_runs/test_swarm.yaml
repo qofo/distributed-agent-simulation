@@ -1,0 +1,20 @@
+experiment:
+  architecture: swarm
+  name: test_swarm
+  task_type: A
+  worker_count: 4
+failure_injection:
+  mode: none
+  straggler_delay_ms: 0
+  target_worker_id: null
+  timing_ms: 0
+simulation:
+  mock_inference_latency_ms: 200
+  retry_policy:
+    enabled: true
+    max_retries: 3
+  timeout_threshold_ms: 5000
+workload:
+  chunk_count: 64
+  requests_per_second: 10.0
+  total_requests: 2

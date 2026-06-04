@@ -35,7 +35,8 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                 if latency_sec > 0:
                     time.sleep(latency_sec)
                     
-                res = adapter.process_chunk(chunk)
+                context = {"logger": logger, "trace_id": trace_id, "architecture": "monolithic", "worker_id": worker_id}
+                res = adapter.process_chunk(chunk, context=context)
                 results.append(res)
                 
                 # End inference
@@ -74,7 +75,8 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                 if latency_sec > 0:
                     time.sleep(latency_sec)
                     
-                state = adapter.process_step(state)
+                context = {"logger": logger, "trace_id": trace_id, "architecture": "monolithic", "worker_id": worker_id}
+                state = adapter.process_step(state, context=context)
                 
                 # End inference
                 logger.inference_end(trace_id, "monolithic", step_task_id, worker_id, config.simulation.mock_inference_latency_ms)
