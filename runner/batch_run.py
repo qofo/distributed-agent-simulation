@@ -34,43 +34,42 @@ CONFIG_TEMPLATE = {
 
 MATRIX = [
     # Task A (Map-Reduce)
-    {"arch": "monolithic", "task": "A", "workers": 1, "chunks": 20, "latency": 50},
-    {"arch": "master_worker", "task": "A", "workers": 2, "chunks": 20, "latency": 50},
-    {"arch": "master_worker", "task": "A", "workers": 4, "chunks": 20, "latency": 50},
-    {"arch": "master_worker", "task": "A", "workers": 16, "chunks": 20, "latency": 50},
-    {"arch": "master_worker", "task": "A", "workers": 32, "chunks": 20, "latency": 50},
-    {"arch": "queue_based", "task": "A", "workers": 2, "chunks": 20, "latency": 50},
-    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 50},
-    {"arch": "queue_based", "task": "A", "workers": 8, "chunks": 20, "latency": 50},
-    {"arch": "queue_based", "task": "A", "workers": 16, "chunks": 20, "latency": 50},
-    {"arch": "queue_based", "task": "A", "workers": 32, "chunks": 20, "latency": 50},
-    {"arch": "swarm", "task": "A", "workers": 4, "chunks": 20, "latency": 50},
-    {"arch": "swarm", "task": "A", "workers": 8, "chunks": 20, "latency": 50},
-    {"arch": "swarm", "task": "A", "workers": 16, "chunks": 20, "latency": 50},
-    {"arch": "swarm", "task": "A", "workers": 32, "chunks": 20, "latency": 50},
+    {"arch": "monolithic", "task": "A", "workers": 1, "chunks": 20, "latency": 2000},
+    {"arch": "master_worker", "task": "A", "workers": 2, "chunks": 20, "latency": 2000},
+    {"arch": "master_worker", "task": "A", "workers": 4, "chunks": 20, "latency": 2000},
+    {"arch": "master_worker", "task": "A", "workers": 16, "chunks": 20, "latency": 2000},
+    {"arch": "master_worker", "task": "A", "workers": 32, "chunks": 20, "latency": 2000},
+    {"arch": "queue_based", "task": "A", "workers": 2, "chunks": 20, "latency": 2000},
+    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 2000},
+    {"arch": "queue_based", "task": "A", "workers": 8, "chunks": 20, "latency": 2000},
+    {"arch": "queue_based", "task": "A", "workers": 16, "chunks": 20, "latency": 2000},
+    {"arch": "queue_based", "task": "A", "workers": 32, "chunks": 20, "latency": 2000},
+    {"arch": "swarm", "task": "A", "workers": 4, "chunks": 20, "latency": 2000},
+    {"arch": "swarm", "task": "A", "workers": 8, "chunks": 20, "latency": 2000},
+    {"arch": "swarm", "task": "A", "workers": 16, "chunks": 20, "latency": 2000},
+    {"arch": "swarm", "task": "A", "workers": 32, "chunks": 20, "latency": 2000},
     
     # Task B (Multi-hop QA)
-    {"arch": "monolithic", "task": "B", "workers": 1, "chunks": 5, "latency": 100},
-    {"arch": "master_worker", "task": "B", "workers": 2, "chunks": 5, "latency": 100},
-    {"arch": "queue_based", "task": "B", "workers": 2, "chunks": 5, "latency": 100},
-    {"arch": "swarm", "task": "B", "workers": 2, "chunks": 5, "latency": 100},
+    {"arch": "monolithic", "task": "B", "workers": 1, "chunks": 5, "latency": 2000},
+    {"arch": "master_worker", "task": "B", "workers": 2, "chunks": 5, "latency": 2000},
+    {"arch": "queue_based", "task": "B", "workers": 2, "chunks": 5, "latency": 2000},
+    {"arch": "swarm", "task": "B", "workers": 2, "chunks": 5, "latency": 2000},
     
     # Straggler (Failure Injection) - Task A (Diverse Delays)
-    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 50, "straggler_target": "queue-worker-1", "straggler_delay": 100},
-    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 50, "straggler_target": "queue-worker-1", "straggler_delay": 500},
-    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 50, "straggler_target": "queue-worker-1", "straggler_delay": 1000},
+    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 2000, "straggler_target": "queue-worker-1", "straggler_delay": 1000},
+    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 2000, "straggler_target": "queue-worker-1", "straggler_delay": 3000},
     
     # Straggler (Failure Injection) - Task B
-    {"arch": "master_worker", "task": "B", "workers": 2, "chunks": 5, "latency": 100, "straggler_target": "mw-worker-1", "straggler_delay": 500},
-    {"arch": "queue_based", "task": "B", "workers": 2, "chunks": 5, "latency": 100, "straggler_target": "queue-worker-1", "straggler_delay": 500},
+    {"arch": "master_worker", "task": "B", "workers": 2, "chunks": 5, "latency": 2000, "straggler_target": "mw-worker-1", "straggler_delay": 3000},
+    {"arch": "queue_based", "task": "B", "workers": 2, "chunks": 5, "latency": 2000, "straggler_target": "queue-worker-1", "straggler_delay": 3000},
     
     # Crash (Failure Injection) - Task A (target set to 'random' to include master)
-    {"arch": "master_worker", "task": "A", "workers": 4, "chunks": 20, "latency": 50, "crash_target": "random"},
-    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 50, "crash_target": "random"},
+    {"arch": "master_worker", "task": "A", "workers": 4, "chunks": 20, "latency": 2000, "crash_target": "random"},
+    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 20, "latency": 2000, "crash_target": "random"},
 ]
 
 def run_batch():
-    batch_id = f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    batch_id = f"batch_sim_v4_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     batch_dir = BASE_DIR / "results" / "batches" / batch_id
     batch_dir.mkdir(parents=True, exist_ok=True)
     
@@ -167,7 +166,7 @@ def run_batch():
     print("\nGenerating report...")
     report_script_path = BASE_DIR / "reports" / "generate_summary.py"
     subprocess.run(
-        ["python", str(report_script_path), "--batch_dir", str(batch_dir), "--output_dir", "report2"],
+        ["python", str(report_script_path), "--batch_dir", str(batch_dir), "--output_dir", "report4"],
         cwd=str(BASE_DIR)
     )
     print("Batch execution and reporting completed.")

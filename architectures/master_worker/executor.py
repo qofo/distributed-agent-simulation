@@ -76,8 +76,8 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
             for future in concurrent.futures.as_completed(futures):
                 try:
                     results.append(future.result())
-                except CrashSimulationError:
-                    pass  # Crashed worker's result is skipped
+                except CrashSimulationError as e:
+                    raise e  # Fail the whole request if a worker crashes without retry logic
 
         # Aggregation
         logger.log_event(LogEvent(trace_id=trace_id, architecture="master_worker", task_id="aggregation", event_type=EventType.AGGREGATION_START, worker_id=master_id))
@@ -105,8 +105,8 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                 future = executor.submit(worker_task_b, state, adapter, config, logger, run_id, trace_id, worker_id)
                 try:
                     state = future.result()
-                except CrashSimulationError:
-                    break  # Stop chain on crash
+                except CrashSimulationError as e:
+                    raise e  # Fail the request on crash
                 
                 # Master logs handoff overhead optionally, or we consider handoff time as part of queue time.
                 if not state["is_complete"]:

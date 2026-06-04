@@ -110,7 +110,7 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                 raise CrashSimulationError("All workers crashed")
                 
             try:
-                res_msg = broker.result_queue.get(timeout=2.0)
+                res_msg = broker.result_queue.get(timeout=10.0)
                 results.append(res_msg["result"])
                 
                 # Pop by exact task_id
@@ -138,7 +138,7 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
         
         # Wait for the single final result
         try:
-            res_msg = broker.result_queue.get(timeout=2.0)
+            res_msg = broker.result_queue.get(timeout=30.0)
             final_result = res_msg["result"]
             broker.result_queue.task_done()
         except queue.Empty:
