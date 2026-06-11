@@ -36,9 +36,9 @@ distributed-agent-simulation/
 ### `core/` (코어 모듈)
 모든 아키텍처가 공통으로 의존하는 기반 시스템입니다.
 * `config.py`: 실험 설정(워커 수, 아키텍처 타입, 장애 주입 등)을 관리합니다.
-* `logger.py` & `log_schema.py`: 추적 가능한 JSON Lines 형태의 로그를 남깁니다. 각 요청마다 `trace_id`를 부여하여 분산 환경에서도 흐름을 추적할 수 있게 합니다.
+* `logger.py` & `log_schema.py`: 추적 가능한 JSON Lines 형태의 로그를 남깁니다. 각 요청마다 `trace_id`를 부여하여 분산 환경에서도 흐름(Failure Chain 포함)을 추적할 수 있게 합니다. 특히 `RUN_METADATA` 이벤트를 통해 Git 커밋과 실험 버전을 명시하여 재현성을 보장합니다.
 * `llm_client.py`: 실제 LLM API를 호출하거나 `mock_llm`을 호출하는 클라이언트 역할을 합니다.
-* `failure_injection.py`: 실험 중 의도적으로 Crash(프로세스 다운)나 Straggler(일부러 지연시킴)를 발생시켜 시스템의 Fault Tolerance를 테스트합니다.
+* `failure_injection.py`: 실험 중 의도적으로 Crash나 Straggler를 발생시켜 시스템의 Fault Tolerance를 테스트합니다. (Queue Stall, Retry 시도 등은 파서를 통해 개별 집계됨)
 
 ### `architectures/` (아키텍처 구현체)
 총 4개의 분산 아키텍처 모델이 구현되어 있습니다. 각 아키텍처는 동일한 워크로드를 각자의 방식으로 처리합니다.
@@ -64,9 +64,9 @@ distributed-agent-simulation/
 코드를 파악하기 위해 다음 순서로 살펴보시는 것을 권장합니다.
 
 1. **설정 확인**: `configs/` 폴더 내의 YAML/JSON 파일들을 열어 어떤 변수(아키텍처, 워크로드, 워커 수 등)를 제어하는지 확인하세요.
-2. **단일 실행 로직 추적**: `runner/run_experiment.py`를 열어봅니다. 이 파일이 설정을 로드한 뒤, `architectures/` 내의 특정 아키텍처 실행기를 호출하는 과정을 따라가 보세요.
+2. **단일 실행 로직 추적**: `runner/run_experiment.py`를 열어봅니다. 이 파일이 설정을 로드하고 `RUN_METADATA`를 기록한 뒤, `architectures/` 내의 특정 아키텍처 실행기를 호출하는 과정을 따라가 보세요.
 3. **아키텍처 비교**: `architectures/monolithic`의 코드와 `architectures/master_worker`의 코드를 비교해보며, 동일한 Task를 분산 처리할 때 코드가 어떻게 달라지는지 파악해보세요.
-4. **로그 구조 이해**: 실험이 끝나면 `logs/` 에 `.jsonl` 파일이 생성됩니다. `core/logger.py`가 어떤 정보를 남기는지 확인하시고, `parser/` 디렉터리의 코드가 이 로그를 어떻게 읽어들여 p50/p99 Latency 및 Throughput 같은 지표로 변환하는지 확인하시면 전체 흐름이 잡힙니다.
+4. **로그 구조 이해**: 실험이 끝나면 `logs/` (또는 지정된 결과 디렉터리)에 `.jsonl` 파일이 생성됩니다. `core/logger.py`가 어떤 정보를 남기는지 확인하시고, `parser/metrics_parser.py`가 이 로그를 어떻게 읽어들여 p50/p99 Latency, Execution Time, Queue Depth(Max/P95), Dispatch Time 등의 세밀한 지표로 변환하는지 확인하시면 전체 흐름이 잡힙니다.
 
 ## 5. 유의 사항 및 다음 단계
 * **Mock LLM vs Real LLM**: 단순 아키텍처 성능 테스트 시에는 비용과 시간 절약을 위해 `mock_llm` 환경을 사용해왔습니다. 실제 성능을 검증할 때는 설정을 변경하여 진짜 API를 타도록 조정해야 합니다.
