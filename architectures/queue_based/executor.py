@@ -28,7 +28,10 @@ def queue_worker_loop(broker: MessageBroker, worker_id: str, config: GlobalConfi
     
     while not stop_event.is_set():
         try:
+            wait_start = time.time()
             msg = broker.task_queue.get(timeout=0.1)
+            wait_end = time.time()
+            logger.profiling(trace_id, "queue_based", "queue_lock_wait_ms", (wait_end - wait_start) * 1000, worker_id)
         except queue.Empty:
             continue
             

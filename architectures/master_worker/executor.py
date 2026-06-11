@@ -82,9 +82,12 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                     raise e  # Fail the whole request if a worker crashes without retry logic
 
         # Aggregation
+        agg_start_time = time.time()
         logger.log_event(LogEvent(trace_id=trace_id, architecture="master_worker", task_id="aggregation", event_type=EventType.AGGREGATION_START, worker_id=master_id))
         final_result = adapter.aggregate(results)
         logger.log_event(LogEvent(trace_id=trace_id, architecture="master_worker", task_id="aggregation", event_type=EventType.AGGREGATION_END, worker_id=master_id))
+        agg_end_time = time.time()
+        logger.profiling(trace_id, "master_worker", "master_aggregation_duration_ms", (agg_end_time - agg_start_time) * 1000, master_id)
         
     elif task_type == "B":
         adapter = TaskBAdapter(total_steps=config.workload.chunk_count)
