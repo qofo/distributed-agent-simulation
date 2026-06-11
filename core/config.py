@@ -21,6 +21,7 @@ class WorkloadConfig:
     dataset_path: str = ""
     total_requests: int = 1
     requests_per_second: float = 1.0
+    max_concurrent_requests: int = 100
 
 @dataclass
 class SimulationConfig:
@@ -82,7 +83,8 @@ def load_config(file_path: str) -> GlobalConfig:
         chunk_count=workload_data.get('chunk_count', 1),
         dataset_path=workload_data.get('dataset_path', ''),
         total_requests=workload_data.get('total_requests', 1),
-        requests_per_second=float(workload_data.get('requests_per_second', 1.0))
+        requests_per_second=float(workload_data.get('requests_per_second', 1.0)),
+        max_concurrent_requests=int(workload_data.get('max_concurrent_requests', 100))
     )
 
     experiment = ExperimentConfig(

@@ -13,12 +13,18 @@ def generate_report(batch_dir: Path, output_dir: Path):
     # df has columns: architecture,total_requests,completed_requests,total_duration_sec,throughput_req_per_sec,p50_latency_sec,p95_latency_sec,p99_latency_sec,avg_queue_wait_sec,retries,timeouts,crashes
     
     # Group by run_name to calculate mean and standard deviation across iterations
-    agg_df = df.groupby('run_name').agg({
+    agg_dict = {
         'throughput_req_per_sec': ['mean', 'std'],
         'p50_latency_sec': ['mean', 'std'],
         'p99_latency_sec': ['mean', 'std'],
         'avg_queue_wait_sec': ['mean', 'std']
-    }).reset_index()
+    }
+    if 'avg_master_aggregation_duration_ms' in df.columns:
+        agg_dict['avg_master_aggregation_duration_ms'] = ['mean', 'std']
+    if 'avg_queue_lock_wait_ms' in df.columns:
+        agg_dict['avg_queue_lock_wait_ms'] = ['mean', 'std']
+        
+    agg_df = df.groupby('run_name').agg(agg_dict).reset_index()
     
     # Flatten multi-level columns
     agg_df.columns = ['_'.join(col).strip() if col[1] else col[0] for col in agg_df.columns.values]

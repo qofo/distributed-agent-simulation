@@ -92,3 +92,6 @@ class StructuredLogger:
 
     def api_429_error(self, trace_id: str, architecture: str, worker_id: str):
         self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id="api-call", event_type=EventType.API_429_ERROR, worker_id=worker_id))
+
+    def profiling(self, trace_id: str, architecture: str, metric_name: str, value_ms: float, worker_id: Optional[str] = None):
+        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id="profiling", event_type=EventType.PROFILING, worker_id=worker_id, details={"metric": metric_name, "value_ms": value_ms}))

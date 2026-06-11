@@ -45,6 +45,9 @@ def compute_metrics(log_file: Path, run_name: str) -> Dict[str, Any]:
     crashes = 0
     api_429_errors = 0
     
+    # Profiling trackers
+    profiling_data = {}
+    
     active_workers = set()
     max_active_workers = 0
     
@@ -79,6 +82,13 @@ def compute_metrics(log_file: Path, run_name: str) -> Dict[str, Any]:
             crashes += 1
         elif evt_type == "API_429_ERROR":
             api_429_errors += 1
+        elif evt_type == "PROFILING":
+            metric_name = event.get("details", {}).get("metric")
+            value_ms = event.get("details", {}).get("value_ms")
+            if metric_name and value_ms is not None:
+                if metric_name not in profiling_data:
+                    profiling_data[metric_name] = []
+                profiling_data[metric_name].append(value_ms)
             
         # Active workers tracking
         if evt_type == "INFERENCE_START" and event.get("worker_id"):
@@ -110,7 +120,9 @@ def compute_metrics(log_file: Path, run_name: str) -> Dict[str, Any]:
         "timeouts": timeouts,
         "crashes": crashes,
         "api_429_errors": api_429_errors,
-        "max_active_workers": max_active_workers
+        "max_active_workers": max_active_workers,
+        "avg_master_aggregation_duration_ms": statistics.mean(profiling_data["master_aggregation_duration_ms"]) if "master_aggregation_duration_ms" in profiling_data and profiling_data["master_aggregation_duration_ms"] else 0.0,
+        "avg_queue_lock_wait_ms": statistics.mean(profiling_data["queue_lock_wait_ms"]) if "queue_lock_wait_ms" in profiling_data and profiling_data["queue_lock_wait_ms"] else 0.0
     }
 
 def write_csv_summary(metrics: Dict[str, Any], output_path: Path):

@@ -21,6 +21,9 @@ class EventType(str, Enum):
     AGGREGATION_START = "AGGREGATION_START"
     AGGREGATION_END = "AGGREGATION_END"
     HANDOFF = "HANDOFF"
+    
+    API_429_ERROR = "API_429_ERROR"
+    PROFILING = "PROFILING"
 
 @dataclass
 class LogEvent:
