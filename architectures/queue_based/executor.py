@@ -26,6 +26,7 @@ def queue_worker_loop(broker: MessageBroker, worker_id: str, config: GlobalConfi
     adapter_a = TaskAAdapter(chunk_count=config.workload.chunk_count)
     adapter_b = TaskBAdapter(total_steps=config.workload.chunk_count)
     
+    logger.worker_state(trace_id, "queue_based", worker_id, "idle")
     while not stop_event.is_set():
         try:
             wait_start = time.time()
@@ -46,9 +47,12 @@ def queue_worker_loop(broker: MessageBroker, worker_id: str, config: GlobalConfi
         
         logger.inference_start(trace_id, "queue_based", task_id, worker_id)
         
+        logger.worker_state(trace_id, "queue_based", worker_id, "busy")
         logger.execution_start(trace_id, "queue_based", task_id, worker_id, "mock")
         if latency_sec > 0:
+            logger.worker_state(trace_id, "queue_based", worker_id, "blocked")
             time.sleep(latency_sec)
+            logger.worker_state(trace_id, "queue_based", worker_id, "busy")
             
         context = {"logger": logger, "trace_id": trace_id, "architecture": "queue_based", "worker_id": worker_id}
             
@@ -72,6 +76,7 @@ def queue_worker_loop(broker: MessageBroker, worker_id: str, config: GlobalConfi
 
         logger.inference_end(trace_id, "queue_based", task_id, worker_id, config.simulation.mock_inference_latency_ms)
         broker.task_queue.task_done()
+        logger.worker_state(trace_id, "queue_based", worker_id, "idle")
 
 def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_id: str):
     """
@@ -95,6 +100,7 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
         workers.append(t)
         
     orchestrator_id = "orchestrator"
+    logger.worker_state(trace_id, "queue_based", orchestrator_id, "busy")
     logger.log_event(LogEvent(trace_id=trace_id, architecture="queue_based", task_id="orchestrator-init", event_type=EventType.TASK_RECEIVED, worker_id=orchestrator_id))
     
     # Check if orchestrator crashes (SPOF)
@@ -119,10 +125,13 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
             # Check if all workers are dead
             if not any(w.is_alive() for w in workers):
                 logger.log_event(LogEvent(trace_id=trace_id, architecture="queue_based", task_id="orchestrator-fail", event_type=EventType.TASK_COMPLETED, worker_id=orchestrator_id, details={"status": "failed", "reason": "All workers crashed"}))
+                logger.worker_state(trace_id, "queue_based", orchestrator_id, "idle")
                 raise CrashSimulationError("All workers crashed")
                 
             try:
+                logger.worker_state(trace_id, "queue_based", orchestrator_id, "blocked")
                 res_msg = broker.result_queue.get(timeout=10.0)
+                logger.worker_state(trace_id, "queue_based", orchestrator_id, "busy")
                 task_id_val = res_msg["task_id"]
                 
                 if task_id_val in pending_chunks:
@@ -137,6 +146,7 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                 
                 broker.result_queue.task_done()
             except queue.Empty:
+                logger.worker_state(trace_id, "queue_based", orchestrator_id, "busy")
                 # Timeout occurred! Re-queue the pending chunks to simulate Dead Letter Queue retry
                 for chunk_task_id, chunk in pending_chunks.items():
                     logger.retry_start(trace_id, "queue_based", chunk_task_id)
@@ -162,10 +172,13 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
         
         # Wait for the single final result
         try:
+            logger.worker_state(trace_id, "queue_based", orchestrator_id, "blocked")
             res_msg = broker.result_queue.get(timeout=30.0)
+            logger.worker_state(trace_id, "queue_based", orchestrator_id, "busy")
             final_result = res_msg["result"]
             broker.result_queue.task_done()
         except queue.Empty:
+            logger.worker_state(trace_id, "queue_based", orchestrator_id, "busy")
             final_result = None  # Chain failed
         
     else:
@@ -173,6 +186,7 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
         raise ValueError(f"Unknown task_type: {task_type}")
 
     # Shutdown workers
+    logger.worker_state(trace_id, "queue_based", orchestrator_id, "idle")
     stop_event.set()
     for w in workers:
         w.join(timeout=1.0)

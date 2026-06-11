@@ -137,3 +137,8 @@ class StructuredLogger:
 
     def profiling(self, trace_id: str, architecture: str, metric_name: str, value_ms: float, worker_id: Optional[str] = None):
         self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id="profiling", event_type=EventType.PROFILING, worker_id=worker_id, details={"metric": metric_name, "value_ms": value_ms}))
+
+    def worker_state(self, trace_id: str, architecture: str, worker_id: str, state: str, details: Optional[Dict[str, Any]] = None):
+        det = details or {}
+        det["state"] = state
+        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id="state-transition", event_type=EventType.WORKER_STATE, worker_id=worker_id, details=det))

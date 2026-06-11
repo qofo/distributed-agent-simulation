@@ -40,6 +40,7 @@ class EventType(str, Enum):
 
     API_429_ERROR = "API_429_ERROR"
     PROFILING = "PROFILING"
+    WORKER_STATE = "WORKER_STATE"
 
 @dataclass
 class LogEvent:

@@ -76,6 +76,8 @@ def compute_metrics(log_file: Path, run_name: str) -> Dict[str, Any]:
     active_workers = defaultdict(int)
     max_active_workers = 0
     
+    worker_state_transitions = defaultdict(list)
+    
     architecture = events[0].get("architecture", "unknown")
     run_metadata = {}
 
@@ -165,6 +167,31 @@ def compute_metrics(log_file: Path, run_name: str) -> Dict[str, Any]:
             worker_id = event.get("worker_id")
             if active_workers[worker_id] > 0:
                 active_workers[worker_id] -= 1
+        elif evt_type == "WORKER_STATE":
+            state = event.get("details", {}).get("state", "unknown")
+            worker_id = event.get("worker_id")
+            if worker_id:
+                worker_state_transitions[worker_id].append((timestamp, state))
+
+    worker_times = {"busy": 0.0, "idle": 0.0, "blocked": 0.0}
+    for worker_id, transitions in worker_state_transitions.items():
+        transitions.sort(key=lambda x: x[0])
+        for i in range(len(transitions) - 1):
+            t1, s1 = transitions[i]
+            t2, s2 = transitions[i+1]
+            duration = (t2 - t1).total_seconds()
+            if s1 in worker_times:
+                worker_times[s1] += duration
+        
+        if transitions:
+            t_last, s_last = transitions[-1]
+            if t_last < end_time and s_last in worker_times:
+                worker_times[s_last] += (end_time - t_last).total_seconds()
+                
+    total_worker_time = sum(worker_times.values())
+    utilization_busy = (worker_times["busy"] / total_worker_time) if total_worker_time > 0 else 0.0
+    utilization_idle = (worker_times["idle"] / total_worker_time) if total_worker_time > 0 else 0.0
+    utilization_blocked = (worker_times["blocked"] / total_worker_time) if total_worker_time > 0 else 0.0
 
     p50_latency = statistics.median(request_latencies) if request_latencies else 0.0
     p95_latency = statistics.quantiles(request_latencies, n=100)[94] if len(request_latencies) > 1 else (request_latencies[0] if request_latencies else 0.0)
@@ -221,7 +248,10 @@ def compute_metrics(log_file: Path, run_name: str) -> Dict[str, Any]:
         "api_429_errors": api_429_errors,
         "max_active_workers": max_active_workers,
         "avg_master_aggregation_duration_ms": statistics.mean(profiling_data["master_aggregation_duration_ms"]) if "master_aggregation_duration_ms" in profiling_data and profiling_data["master_aggregation_duration_ms"] else 0.0,
-        "avg_queue_lock_wait_ms": statistics.mean(profiling_data["queue_lock_wait_ms"]) if "queue_lock_wait_ms" in profiling_data and profiling_data["queue_lock_wait_ms"] else 0.0
+        "avg_queue_lock_wait_ms": statistics.mean(profiling_data["queue_lock_wait_ms"]) if "queue_lock_wait_ms" in profiling_data and profiling_data["queue_lock_wait_ms"] else 0.0,
+        "utilization_busy": utilization_busy,
+        "utilization_idle": utilization_idle,
+        "utilization_blocked": utilization_blocked
     }
     
     result.update(avg_dispatch_times)

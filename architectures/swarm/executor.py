@@ -26,6 +26,7 @@ def _agent_process_task_a(chunk, adapter, config, logger, run_id, trace_id, agen
     chunk_task_id = f"{run_id}-{chunk['chunk_id']}"
     latency_sec = get_effective_latency(config, agent_id)
 
+    logger.worker_state(trace_id, "swarm", agent_id, "busy")
     logger.dequeued(trace_id, "swarm", chunk_task_id, agent_id)
 
     # Crash check
@@ -35,13 +36,16 @@ def _agent_process_task_a(chunk, adapter, config, logger, run_id, trace_id, agen
 
     logger.execution_start(trace_id, "swarm", chunk_task_id, agent_id, "mock")
     if latency_sec > 0:
+        logger.worker_state(trace_id, "swarm", agent_id, "blocked")
         time.sleep(latency_sec)
+        logger.worker_state(trace_id, "swarm", agent_id, "busy")
 
     context = {"logger": logger, "trace_id": trace_id, "architecture": "swarm", "worker_id": agent_id}
     res = adapter.process_chunk(chunk, context=context)
     logger.execution_end(trace_id, "swarm", chunk_task_id, agent_id, "mock", int(latency_sec * 1000))
 
     logger.inference_end(trace_id, "swarm", chunk_task_id, agent_id, config.simulation.mock_inference_latency_ms)
+    logger.worker_state(trace_id, "swarm", agent_id, "idle")
     return res
 
 
@@ -112,6 +116,7 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
 
         # Aggregation: 마지막 에이전트가 수행
         last_agent = routing_table[len(chunks) - 1]
+        logger.worker_state(trace_id, "swarm", last_agent, "busy")
         logger.log_event(LogEvent(
             trace_id=trace_id, architecture="swarm",
             task_id="aggregation", event_type=EventType.AGGREGATION_START,
@@ -124,6 +129,7 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
             task_id="aggregation", event_type=EventType.AGGREGATION_END,
             worker_id=last_agent
         ))
+        logger.worker_state(trace_id, "swarm", last_agent, "idle")
 
     elif task_type == "B":
         # Task B: 순차 핸드오프 (에이전트 간 직접 전달)
@@ -144,6 +150,7 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
             step_task_id = f"{run_id}-step-{state['current_step']}"
             latency_sec = get_effective_latency(config, current_agent)
 
+            logger.worker_state(trace_id, "swarm", current_agent, "busy")
             logger.dequeued(trace_id, "swarm", step_task_id, current_agent)
 
             # Crash check
@@ -153,7 +160,9 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
 
             logger.execution_start(trace_id, "swarm", step_task_id, current_agent, "mock")
             if latency_sec > 0:
+                logger.worker_state(trace_id, "swarm", current_agent, "blocked")
                 time.sleep(latency_sec)
+                logger.worker_state(trace_id, "swarm", current_agent, "busy")
 
             context = {"logger": logger, "trace_id": trace_id, "architecture": "swarm", "worker_id": current_agent}
             state = adapter.process_step(state, context=context)
@@ -174,6 +183,7 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                 ))
                 logger.dispatch_end(trace_id, "swarm", f"handoff-{state['current_step']}", current_agent, "swarm_route")
 
+            logger.worker_state(trace_id, "swarm", current_agent, "idle")
             step_counter += 1
 
     else:
