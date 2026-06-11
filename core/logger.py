@@ -27,6 +27,9 @@ class StructuredLogger:
                 cls._instances[name] = instance
                 instance._init_logger(name, log_file)
                 instance._disabled = disabled
+            else:
+                instance = cls._instances[name]
+                instance._disabled = disabled
             return cls._instances[name]
 
     def _init_logger(self, name: str, log_file: Optional[str]):
