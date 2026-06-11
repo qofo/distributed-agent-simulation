@@ -72,7 +72,20 @@ def get_git_commit():
 def main():
     parser = argparse.ArgumentParser(description="Distributed Agent Simulation Runner")
     parser.add_argument("--config", type=str, required=True, help="Path to experiment config YAML")
+    parser.add_argument(
+        "--logger-mode",
+        choices=["normal", "disabled", "null"],
+        default="normal",
+        help=(
+            "Logging mode for overhead measurement: "
+            "normal=full logging (default), "
+            "disabled=I/O blocked (call overhead measured), "
+            "null=NullLogger no-op (zero logging cost)"
+        )
+    )
     args = parser.parse_args()
+
+
 
     try:
         # 1. Load config
@@ -111,11 +124,21 @@ def main():
             
         # 5. Initialize Logger for this run
         log_file_path = dirs["log_dir"] / "events.jsonl"
-        logger = StructuredLogger(name=f"run_{run_id}", log_file=str(log_file_path))
-        
+        logger_mode = args.logger_mode
+
+        if logger_mode == "null":
+            from core.null_logger import NullLogger
+            logger = NullLogger()
+            print(f"[{datetime.now().isoformat()}] INFO: Logger mode = null (NullLogger, no events recorded)")
+        elif logger_mode == "disabled":
+            logger = StructuredLogger(name=f"run_{run_id}", log_file=str(log_file_path), disabled=True)
+            print(f"[{datetime.now().isoformat()}] INFO: Logger mode = disabled (I/O blocked, call overhead measured)")
+        else:
+            logger = StructuredLogger(name=f"run_{run_id}", log_file=str(log_file_path))
+
         # Log system start
         trace_id = f"sys-{run_id}"
-        
+
         logger.run_metadata(trace_id, config.experiment.architecture, metadata)
         
         print(f"[{datetime.now().isoformat()}] INFO: Starting run {run_id} (Arch: {config.experiment.architecture}, Requests: {config.workload.total_requests})")

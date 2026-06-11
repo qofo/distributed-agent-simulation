@@ -19,13 +19,14 @@ class StructuredLogger:
     _instances = {}
     _lock = threading.Lock()
 
-    def __new__(cls, name: str, log_file: Optional[str] = None):
+    def __new__(cls, name: str, log_file: Optional[str] = None, disabled: bool = False):
         """Implement a thread-safe singleton pattern per logger name."""
         with cls._lock:
             if name not in cls._instances:
                 instance = super(StructuredLogger, cls).__new__(cls)
                 cls._instances[name] = instance
                 instance._init_logger(name, log_file)
+                instance._disabled = disabled
             return cls._instances[name]
 
     def _init_logger(self, name: str, log_file: Optional[str]):
@@ -51,7 +52,9 @@ class StructuredLogger:
             self.logger.addHandler(console_handler)
 
     def log_event(self, event: LogEvent):
-        """Log a generic event."""
+        """Log a generic event. No-ops when disabled=True (I/O is skipped but call overhead remains)."""
+        if getattr(self, '_disabled', False):
+            return
         self.logger.info(event)
 
     # Helper methods for common events
