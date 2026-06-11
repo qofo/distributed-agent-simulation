@@ -87,8 +87,50 @@ class StructuredLogger:
                          event_type=EventType.DEQUEUED, worker_id=worker_id, details=details or {})
         self.log_event(event)
 
-    def crash(self, trace_id: str, architecture: str, task_id: str, worker_id: str, reason: str):
-        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, event_type=EventType.CRASH, worker_id=worker_id, details={"reason": reason}))
+    def dispatch_start(self, trace_id: str, architecture: str, task_id: str, worker_id: str, dispatch_type: str):
+        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, event_type=EventType.DISPATCH_START, worker_id=worker_id, details={"dispatch_type": dispatch_type}))
+
+    def dispatch_end(self, trace_id: str, architecture: str, task_id: str, worker_id: str, dispatch_type: str):
+        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, event_type=EventType.DISPATCH_END, worker_id=worker_id, details={"dispatch_type": dispatch_type}))
+
+    def execution_start(self, trace_id: str, architecture: str, task_id: str, worker_id: str, execution_mode: str):
+        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, event_type=EventType.EXECUTION_START, worker_id=worker_id, details={"execution_mode": execution_mode}))
+
+    def execution_end(self, trace_id: str, architecture: str, task_id: str, worker_id: str, execution_mode: str, latency_ms: int):
+        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, event_type=EventType.EXECUTION_END, worker_id=worker_id, details={"execution_mode": execution_mode, "latency_ms": latency_ms}))
+
+    def retry_start(self, trace_id: str, architecture: str, task_id: str):
+        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, event_type=EventType.RETRY_START))
+
+    def retry_end(self, trace_id: str, architecture: str, task_id: str):
+        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, event_type=EventType.RETRY_END))
+
+    def run_metadata(self, trace_id: str, architecture: str, metadata_dict: Dict[str, Any]):
+        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id="system-init", event_type=EventType.RUN_METADATA, details=metadata_dict))
+
+    def worker_crash(self, trace_id: str, architecture: str, task_id: str, worker_id: str, reason: str, root_cause: Optional[str] = None):
+        details = {"reason": reason}
+        if root_cause:
+            details["root_cause"] = root_cause
+        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, event_type=EventType.WORKER_CRASH, worker_id=worker_id, details=details))
+
+    def queue_stall(self, trace_id: str, architecture: str, task_id: str, worker_id: str, wait_ms: float, root_cause: Optional[str] = None):
+        details = {"wait_ms": wait_ms}
+        if root_cause:
+            details["root_cause"] = root_cause
+        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, event_type=EventType.QUEUE_STALL, worker_id=worker_id, details=details))
+
+    def retry_attempt(self, trace_id: str, architecture: str, task_id: str, worker_id: str, attempt_num: int, reason: str, root_cause: Optional[str] = None):
+        details = {"attempt_num": attempt_num, "reason": reason}
+        if root_cause:
+            details["root_cause"] = root_cause
+        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, event_type=EventType.RETRY_ATTEMPT, worker_id=worker_id, details=details))
+
+    def timeout_hit(self, trace_id: str, architecture: str, task_id: str, worker_id: str, elapsed_ms: float, root_cause: Optional[str] = None):
+        details = {"elapsed_ms": elapsed_ms}
+        if root_cause:
+            details["root_cause"] = root_cause
+        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, event_type=EventType.TIMEOUT_HIT, worker_id=worker_id, details=details))
 
     def api_429_error(self, trace_id: str, architecture: str, worker_id: str):
         self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id="api-call", event_type=EventType.API_429_ERROR, worker_id=worker_id))

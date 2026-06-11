@@ -42,5 +42,5 @@ def check_crash(config: GlobalConfig, worker_id: str, logger, trace_id: str, arc
     if config.failure_injection.mode == "crash":
         target = config.failure_injection.target_worker_id
         if target is not None and target == worker_id:
-            logger.error_crash(trace_id, architecture, task_id, worker_id, "Simulated crash injection")
+            logger.worker_crash(trace_id, architecture, task_id, worker_id, "Simulated crash injection", root_cause="worker_crash")
             raise CrashSimulationError(f"Worker {worker_id} crashed (simulated)")

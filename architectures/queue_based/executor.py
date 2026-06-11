@@ -36,7 +36,7 @@ def queue_worker_loop(broker: MessageBroker, worker_id: str, config: GlobalConfi
             continue
             
         task_id = msg.get("task_id")
-        logger.dequeued(trace_id, "queue_based", task_id, worker_id)
+        logger.dequeued(trace_id, "queue_based", task_id, worker_id, details={"queue_depth": broker.task_queue.qsize()})
         
         try:
             check_crash(config, worker_id, logger, trace_id, "queue_based", task_id)
@@ -46,8 +46,10 @@ def queue_worker_loop(broker: MessageBroker, worker_id: str, config: GlobalConfi
         
         logger.inference_start(trace_id, "queue_based", task_id, worker_id)
         
+        logger.execution_start(trace_id, "queue_based", task_id, worker_id, "mock")
         if latency_sec > 0:
             time.sleep(latency_sec)
+        logger.execution_end(trace_id, "queue_based", task_id, worker_id, "mock", int(latency_sec * 1000))
             
         context = {"logger": logger, "trace_id": trace_id, "architecture": "queue_based", "worker_id": worker_id}
             
@@ -62,8 +64,10 @@ def queue_worker_loop(broker: MessageBroker, worker_id: str, config: GlobalConfi
                 broker.result_queue.put({"task_id": task_id, "result": new_state})
             else:
                 next_task_id = f"{run_id}-step-{new_state['current_step']}"
+                logger.dispatch_start(trace_id, "queue_based", next_task_id, worker_id, "queue_put")
                 broker.task_queue.put({"task_id": next_task_id, "payload": new_state})
-                logger.queued(trace_id, "queue_based", next_task_id)
+                logger.dispatch_end(trace_id, "queue_based", next_task_id, worker_id, "queue_put")
+                logger.queued(trace_id, "queue_based", next_task_id, details={"queue_depth": broker.task_queue.qsize()})
 
         logger.inference_end(trace_id, "queue_based", task_id, worker_id, config.simulation.mock_inference_latency_ms)
         broker.task_queue.task_done()
@@ -101,8 +105,10 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
         
         for chunk in chunks:
             chunk_task_id = f"{run_id}-{chunk['chunk_id']}"
+            logger.dispatch_start(trace_id, "queue_based", chunk_task_id, orchestrator_id, "queue_put")
             broker.task_queue.put({"task_id": chunk_task_id, "payload": chunk})
-            logger.queued(trace_id, "queue_based", chunk_task_id)
+            logger.dispatch_end(trace_id, "queue_based", chunk_task_id, orchestrator_id, "queue_put")
+            logger.queued(trace_id, "queue_based", chunk_task_id, details={"queue_depth": broker.task_queue.qsize()})
             
         results = []
         pending_chunks = {f"{run_id}-{chunk['chunk_id']}": chunk for chunk in chunks}
@@ -125,8 +131,13 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
             except queue.Empty:
                 # Timeout occurred! Re-queue the pending chunks to simulate Dead Letter Queue retry
                 for chunk_task_id, chunk in pending_chunks.items():
+                    logger.retry_start(trace_id, "queue_based", chunk_task_id)
+                    logger.queue_stall(trace_id, "queue_based", chunk_task_id, orchestrator_id, 10000, root_cause="queue_stall")
+                    logger.dispatch_start(trace_id, "queue_based", f"{chunk_task_id}-retry", orchestrator_id, "queue_put")
                     broker.task_queue.put({"task_id": chunk_task_id, "payload": chunk})
-                    logger.queued(trace_id, "queue_based", f"{chunk_task_id}-retry")
+                    logger.dispatch_end(trace_id, "queue_based", f"{chunk_task_id}-retry", orchestrator_id, "queue_put")
+                    logger.queued(trace_id, "queue_based", f"{chunk_task_id}-retry", details={"queue_depth": broker.task_queue.qsize()})
+                    logger.retry_end(trace_id, "queue_based", chunk_task_id)
             
         logger.log_event(LogEvent(trace_id=trace_id, architecture="queue_based", task_id="aggregation", event_type=EventType.AGGREGATION_START, worker_id=orchestrator_id))
         final_result = adapter.aggregate(results)
@@ -137,8 +148,10 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
         state = adapter.create_initial_state("dummy_query")
         
         step_task_id = f"{run_id}-step-{state['current_step']}"
+        logger.dispatch_start(trace_id, "queue_based", step_task_id, orchestrator_id, "queue_put")
         broker.task_queue.put({"task_id": step_task_id, "payload": state})
-        logger.queued(trace_id, "queue_based", step_task_id)
+        logger.dispatch_end(trace_id, "queue_based", step_task_id, orchestrator_id, "queue_put")
+        logger.queued(trace_id, "queue_based", step_task_id, details={"queue_depth": broker.task_queue.qsize()})
         
         # Wait for the single final result
         try:

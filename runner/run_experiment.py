@@ -102,6 +102,8 @@ def main():
         # Log system start
         trace_id = f"sys-{run_id}"
         
+        logger.run_metadata(trace_id, config.experiment.architecture, metadata)
+        
         print(f"[{datetime.now().isoformat()}] INFO: Starting run {run_id} (Arch: {config.experiment.architecture}, Requests: {config.workload.total_requests})")
         
         # 6. Randomize crash target if needed

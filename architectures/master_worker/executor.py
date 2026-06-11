@@ -17,8 +17,10 @@ def worker_task_a(chunk, adapter, config: GlobalConfig, logger: StructuredLogger
     
     logger.inference_start(trace_id, "master_worker", chunk_task_id, worker_id)
     
+    logger.execution_start(trace_id, "master_worker", chunk_task_id, worker_id, "mock")
     if latency_sec > 0:
         time.sleep(latency_sec)
+    logger.execution_end(trace_id, "master_worker", chunk_task_id, worker_id, "mock", int(latency_sec * 1000))
         
     context = {"logger": logger, "trace_id": trace_id, "architecture": "master_worker", "worker_id": worker_id}
     res = adapter.process_chunk(chunk, context=context)
@@ -37,8 +39,10 @@ def worker_task_b(state, adapter, config: GlobalConfig, logger: StructuredLogger
     
     logger.inference_start(trace_id, "master_worker", step_task_id, worker_id)
     
+    logger.execution_start(trace_id, "master_worker", step_task_id, worker_id, "mock")
     if latency_sec > 0:
         time.sleep(latency_sec)
+    logger.execution_end(trace_id, "master_worker", step_task_id, worker_id, "mock", int(latency_sec * 1000))
         
     context = {"logger": logger, "trace_id": trace_id, "architecture": "master_worker", "worker_id": worker_id}
     new_state = adapter.process_step(state, context=context)
@@ -73,7 +77,9 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                 logger.queued(trace_id, "master_worker", chunk_task_id)
                 
                 worker_id = f"mw-worker-{i % worker_count + 1}"
+                logger.dispatch_start(trace_id, "master_worker", chunk_task_id, master_id, "master_worker_submit")
                 futures.append(executor.submit(worker_task_a, chunk, adapter, config, logger, run_id, trace_id, worker_id))
+                logger.dispatch_end(trace_id, "master_worker", chunk_task_id, master_id, "master_worker_submit")
             
             for future in concurrent.futures.as_completed(futures):
                 try:
@@ -107,7 +113,9 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                 logger.queued(trace_id, "master_worker", step_task_id)
                 
                 worker_id = f"mw-worker-{(step_counter % worker_count) + 1}"
+                logger.dispatch_start(trace_id, "master_worker", step_task_id, master_id, "master_worker_submit")
                 future = executor.submit(worker_task_b, state, adapter, config, logger, run_id, trace_id, worker_id)
+                logger.dispatch_end(trace_id, "master_worker", step_task_id, master_id, "master_worker_submit")
                 try:
                     state = future.result()
                 except CrashSimulationError as e:

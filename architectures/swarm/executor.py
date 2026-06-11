@@ -33,8 +33,10 @@ def _agent_process_task_a(chunk, adapter, config, logger, run_id, trace_id, agen
 
     logger.inference_start(trace_id, "swarm", chunk_task_id, agent_id)
 
+    logger.execution_start(trace_id, "swarm", chunk_task_id, agent_id, "mock")
     if latency_sec > 0:
         time.sleep(latency_sec)
+    logger.execution_end(trace_id, "swarm", chunk_task_id, agent_id, "mock", int(latency_sec * 1000))
 
     context = {"logger": logger, "trace_id": trace_id, "architecture": "swarm", "worker_id": agent_id}
     res = adapter.process_chunk(chunk, context=context)
@@ -86,6 +88,7 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                 # 이전 에이전트가 다음 에이전트에게 핸드오프 로그
                 if i > 0:
                     prev_agent = routing_table[i - 1]
+                    logger.dispatch_start(trace_id, "swarm", f"handoff-chunk-{i}", prev_agent, "swarm_route")
                     logger.log_event(LogEvent(
                         trace_id=trace_id, architecture="swarm",
                         task_id=f"handoff-chunk-{i}",
@@ -93,9 +96,12 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                         worker_id=prev_agent,
                         details={"target_agent": agent_id}
                     ))
+                    logger.dispatch_end(trace_id, "swarm", f"handoff-chunk-{i}", prev_agent, "swarm_route")
 
                 logger.queued(trace_id, "swarm", chunk_task_id)
+                logger.dispatch_start(trace_id, "swarm", chunk_task_id, initiator_id, "swarm_route")
                 futures.append(executor.submit(worker_fn, i, chunk))
+                logger.dispatch_end(trace_id, "swarm", chunk_task_id, initiator_id, "swarm_route")
 
             # 결과를 순서대로 취합 (Crash 발생 시 예외 발생으로 Request 전체 실패)
             for i, future in enumerate(futures):
@@ -145,8 +151,10 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
 
             logger.inference_start(trace_id, "swarm", step_task_id, current_agent)
 
+            logger.execution_start(trace_id, "swarm", step_task_id, current_agent, "mock")
             if latency_sec > 0:
                 time.sleep(latency_sec)
+            logger.execution_end(trace_id, "swarm", step_task_id, current_agent, "mock", int(latency_sec * 1000))
 
             context = {"logger": logger, "trace_id": trace_id, "architecture": "swarm", "worker_id": current_agent}
             state = adapter.process_step(state, context=context)
@@ -156,6 +164,7 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
             # 핸드오프 로그 (다음 에이전트에게 직접 전달)
             if not state["is_complete"]:
                 next_agent = routing_table.get(step_counter + 1, f"swarm-agent-{((step_counter + 1) % worker_count) + 1}")
+                logger.dispatch_start(trace_id, "swarm", f"handoff-{state['current_step']}", current_agent, "swarm_route")
                 logger.log_event(LogEvent(
                     trace_id=trace_id, architecture="swarm",
                     task_id=f"handoff-{state['current_step']}",
@@ -163,6 +172,7 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                     worker_id=current_agent,
                     details={"target_agent": next_agent}
                 ))
+                logger.dispatch_end(trace_id, "swarm", f"handoff-{state['current_step']}", current_agent, "swarm_route")
 
             step_counter += 1
 

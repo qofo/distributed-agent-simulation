@@ -38,20 +38,45 @@ def compute_metrics(log_file: Path, run_name: str) -> Dict[str, Any]:
     queue_start_times = {}
     queue_wait_times = []
     
+    dispatch_start_times = {}
+    dispatch_times = []
+    
+    execution_start_times = {}
+    execution_times = []
+    
+    aggregation_start_times = {}
+    aggregation_times = []
+    
+    retry_start_times = {}
+    retry_times = []
+    
     completed_requests = 0
-    failed_requests = 0
+    
+    # New Coordination Cost trackers
+    queue_ops = 0
+    handoffs = 0
+    aggregations = 0
+    queue_depth_sum = 0
+    queue_depth_count = 0
+    
+    # New Failure trackers
+    worker_crashes = 0
+    queue_stalls = 0
+    retry_attempts = 0
+    timeouts_hit = 0
+    failure_root_causes = defaultdict(int)
+    
     retries = 0
     timeouts = 0
     crashes = 0
     api_429_errors = 0
     
-    # Profiling trackers
     profiling_data = {}
-    
     active_workers = set()
     max_active_workers = 0
     
     architecture = events[0].get("architecture", "unknown")
+    run_metadata = {}
 
     for event in events:
         trace_id = event.get("trace_id")
@@ -61,19 +86,57 @@ def compute_metrics(log_file: Path, run_name: str) -> Dict[str, Any]:
         
         uniq_key = f"{trace_id}:{task_id}"
 
-        if evt_type == "TASK_RECEIVED":
+        if evt_type == "RUN_METADATA":
+            run_metadata = event.get("details", {})
+        elif evt_type == "TASK_RECEIVED":
             request_start_times[trace_id] = timestamp
         elif evt_type == "TASK_COMPLETED":
             if trace_id in request_start_times:
                 latency = (timestamp - request_start_times[trace_id]).total_seconds()
                 request_latencies.append(latency)
                 completed_requests += 1
-        elif evt_type == "QUEUED":
-            queue_start_times[uniq_key] = timestamp
-        elif evt_type == "DEQUEUED":
-            if uniq_key in queue_start_times:
-                wait_time = (timestamp - queue_start_times[uniq_key]).total_seconds()
-                queue_wait_times.append(wait_time)
+        elif evt_type == "DISPATCH_START":
+            dispatch_start_times[uniq_key] = timestamp
+        elif evt_type == "DISPATCH_END":
+            if uniq_key in dispatch_start_times:
+                dispatch_times.append((timestamp - dispatch_start_times[uniq_key]).total_seconds())
+        elif evt_type == "EXECUTION_START":
+            execution_start_times[uniq_key] = timestamp
+        elif evt_type == "EXECUTION_END":
+            if uniq_key in execution_start_times:
+                execution_times.append((timestamp - execution_start_times[uniq_key]).total_seconds())
+        elif evt_type == "RETRY_START":
+            retry_start_times[uniq_key] = timestamp
+        elif evt_type == "RETRY_END":
+            if uniq_key in retry_start_times:
+                retry_times.append((timestamp - retry_start_times[uniq_key]).total_seconds())
+        elif evt_type == "AGGREGATION_START":
+            aggregation_start_times[uniq_key] = timestamp
+            aggregations += 1
+        elif evt_type == "AGGREGATION_END":
+            if uniq_key in aggregation_start_times:
+                aggregation_times.append((timestamp - aggregation_start_times[uniq_key]).total_seconds())
+        elif evt_type == "QUEUED" or evt_type == "DEQUEUED":
+            queue_ops += 1
+            if "queue_depth" in event.get("details", {}):
+                queue_depth_sum += event["details"]["queue_depth"]
+                queue_depth_count += 1
+            if evt_type == "QUEUED":
+                queue_start_times[uniq_key] = timestamp
+            elif evt_type == "DEQUEUED":
+                if uniq_key in queue_start_times:
+                    wait_time = (timestamp - queue_start_times[uniq_key]).total_seconds()
+                    queue_wait_times.append(wait_time)
+        elif evt_type == "HANDOFF":
+            handoffs += 1
+        elif evt_type in ["WORKER_CRASH", "QUEUE_STALL", "RETRY_ATTEMPT", "TIMEOUT_HIT"]:
+            if evt_type == "WORKER_CRASH": worker_crashes += 1
+            elif evt_type == "QUEUE_STALL": queue_stalls += 1
+            elif evt_type == "RETRY_ATTEMPT": retry_attempts += 1
+            elif evt_type == "TIMEOUT_HIT": timeouts_hit += 1
+            root_cause = event.get("details", {}).get("root_cause")
+            if root_cause:
+                failure_root_causes[root_cause] += 1
         elif evt_type == "RETRY":
             retries += 1
         elif evt_type == "TIMEOUT":
@@ -90,24 +153,31 @@ def compute_metrics(log_file: Path, run_name: str) -> Dict[str, Any]:
                     profiling_data[metric_name] = []
                 profiling_data[metric_name].append(value_ms)
             
-        # Active workers tracking
-        if evt_type == "INFERENCE_START" and event.get("worker_id"):
+        if evt_type in ["INFERENCE_START", "EXECUTION_START"] and event.get("worker_id"):
             active_workers.add(event.get("worker_id"))
             max_active_workers = max(max_active_workers, len(active_workers))
-        elif evt_type == "INFERENCE_END" and event.get("worker_id"):
+        elif evt_type in ["INFERENCE_END", "EXECUTION_END"] and event.get("worker_id"):
             active_workers.discard(event.get("worker_id"))
 
-    # Calculations
     p50_latency = statistics.median(request_latencies) if request_latencies else 0.0
     p95_latency = statistics.quantiles(request_latencies, n=100)[94] if len(request_latencies) > 1 else (request_latencies[0] if request_latencies else 0.0)
     p99_latency = statistics.quantiles(request_latencies, n=100)[98] if len(request_latencies) > 1 else (request_latencies[0] if request_latencies else 0.0)
     
     avg_queue_wait = statistics.mean(queue_wait_times) if queue_wait_times else 0.0
+    avg_dispatch_time = statistics.mean(dispatch_times) if dispatch_times else 0.0
+    avg_execution_time = statistics.mean(execution_times) if execution_times else 0.0
+    avg_aggregation_time = statistics.mean(aggregation_times) if aggregation_times else 0.0
+    avg_retry_delay = statistics.mean(retry_times) if retry_times else 0.0
+    avg_queue_depth = (queue_depth_sum / queue_depth_count) if queue_depth_count > 0 else 0.0
     throughput = (completed_requests / total_duration_sec) if total_duration_sec > 0 else 0.0
 
     return {
         "run_name": run_name,
         "architecture": architecture,
+        "task_type": run_metadata.get("experiment", {}).get("task_type", "unknown"),
+        "worker_count": run_metadata.get("experiment", {}).get("worker_count", 0),
+        "failure_mode": run_metadata.get("failure_injection", {}).get("mode", "none"),
+        "straggler_delay_ms": run_metadata.get("failure_injection", {}).get("straggler_delay_ms", 0),
         "total_requests": len(request_start_times),
         "completed_requests": completed_requests,
         "total_duration_sec": total_duration_sec,
@@ -116,6 +186,19 @@ def compute_metrics(log_file: Path, run_name: str) -> Dict[str, Any]:
         "p95_latency_sec": p95_latency,
         "p99_latency_sec": p99_latency,
         "avg_queue_wait_sec": avg_queue_wait,
+        "avg_dispatch_time_sec": avg_dispatch_time,
+        "avg_execution_time_sec": avg_execution_time,
+        "avg_aggregation_time_sec": avg_aggregation_time,
+        "avg_retry_delay_sec": avg_retry_delay,
+        "total_queue_ops": queue_ops,
+        "total_handoffs": handoffs,
+        "total_aggregations": aggregations,
+        "avg_queue_depth": avg_queue_depth,
+        "worker_crashes": worker_crashes,
+        "queue_stalls": queue_stalls,
+        "retry_attempts": retry_attempts,
+        "timeouts_hit": timeouts_hit,
+        "failure_root_causes": json.dumps(dict(failure_root_causes)),
         "retries": retries,
         "timeouts": timeouts,
         "crashes": crashes,

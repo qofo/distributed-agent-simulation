@@ -3,7 +3,7 @@ from core.config import GlobalConfig
 from core.logger import StructuredLogger
 from workloads.task_a import TaskAAdapter
 from workloads.task_b import TaskBAdapter
-from core.failure_injection import get_effective_latency, check_crash
+from core.failure_injection import get_effective_latency, check_crash, CrashSimulationError
 
 def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_id: str):
     """
@@ -32,8 +32,10 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                 logger.inference_start(trace_id, "monolithic", chunk_task_id, worker_id)
                 
                 # Simulate work
+                logger.execution_start(trace_id, "monolithic", chunk_task_id, worker_id, "mock")
                 if latency_sec > 0:
                     time.sleep(latency_sec)
+                logger.execution_end(trace_id, "monolithic", chunk_task_id, worker_id, "mock", int(latency_sec * 1000))
                     
                 context = {"logger": logger, "trace_id": trace_id, "architecture": "monolithic", "worker_id": worker_id}
                 res = adapter.process_chunk(chunk, context=context)
@@ -72,8 +74,10 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                 logger.inference_start(trace_id, "monolithic", step_task_id, worker_id)
                 
                 # Simulate work
+                logger.execution_start(trace_id, "monolithic", step_task_id, worker_id, "mock")
                 if latency_sec > 0:
                     time.sleep(latency_sec)
+                logger.execution_end(trace_id, "monolithic", step_task_id, worker_id, "mock", int(latency_sec * 1000))
                     
                 context = {"logger": logger, "trace_id": trace_id, "architecture": "monolithic", "worker_id": worker_id}
                 state = adapter.process_step(state, context=context)
