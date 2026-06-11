@@ -49,17 +49,18 @@ def queue_worker_loop(broker: MessageBroker, worker_id: str, config: GlobalConfi
         logger.execution_start(trace_id, "queue_based", task_id, worker_id, "mock")
         if latency_sec > 0:
             time.sleep(latency_sec)
-        logger.execution_end(trace_id, "queue_based", task_id, worker_id, "mock", int(latency_sec * 1000))
             
         context = {"logger": logger, "trace_id": trace_id, "architecture": "queue_based", "worker_id": worker_id}
             
         if task_type == "A":
             chunk = msg.get("payload")
             res = adapter_a.process_chunk(chunk, context=context)
+            logger.execution_end(trace_id, "queue_based", task_id, worker_id, "mock", int(latency_sec * 1000))
             broker.result_queue.put({"task_id": task_id, "result": res})
         elif task_type == "B":
             state = msg.get("payload")
             new_state = adapter_b.process_step(state, context=context)
+            logger.execution_end(trace_id, "queue_based", task_id, worker_id, "mock", int(latency_sec * 1000))
             if new_state["is_complete"]:
                 broker.result_queue.put({"task_id": task_id, "result": new_state})
             else:
@@ -123,9 +124,16 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
             try:
                 res_msg = broker.result_queue.get(timeout=10.0)
                 task_id_val = res_msg["task_id"]
+                
                 if task_id_val in pending_chunks:
                     results.append(res_msg["result"])
                     pending_chunks.pop(task_id_val)
+                elif task_id_val.endswith("-retry"):
+                    orig_id = task_id_val.replace("-retry", "")
+                    if orig_id in pending_chunks:
+                        logger.retry_end(trace_id, "queue_based", orig_id)
+                        results.append(res_msg["result"])
+                        pending_chunks.pop(orig_id)
                 
                 broker.result_queue.task_done()
             except queue.Empty:
@@ -134,10 +142,9 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                     logger.retry_start(trace_id, "queue_based", chunk_task_id)
                     logger.queue_stall(trace_id, "queue_based", chunk_task_id, orchestrator_id, 10000, root_cause="queue_stall")
                     logger.dispatch_start(trace_id, "queue_based", f"{chunk_task_id}-retry", orchestrator_id, "queue_put")
-                    broker.task_queue.put({"task_id": chunk_task_id, "payload": chunk})
+                    broker.task_queue.put({"task_id": f"{chunk_task_id}-retry", "payload": chunk})
                     logger.dispatch_end(trace_id, "queue_based", f"{chunk_task_id}-retry", orchestrator_id, "queue_put")
                     logger.queued(trace_id, "queue_based", f"{chunk_task_id}-retry", details={"queue_depth": broker.task_queue.qsize()})
-                    logger.retry_end(trace_id, "queue_based", chunk_task_id)
             
         logger.log_event(LogEvent(trace_id=trace_id, architecture="queue_based", task_id="aggregation", event_type=EventType.AGGREGATION_START, worker_id=orchestrator_id))
         final_result = adapter.aggregate(results)

@@ -1,0 +1,23 @@
+{
+  "run_id": "20260611_202001_queue_based_A_feadd9c1",
+  "start_time": "2026-06-11T20:20:01.992755",
+  "experiment": {
+    "task_type": "A",
+    "worker_count": 4,
+    "git_commit": "96d4d45255c33e8397f6378051893027b9537f28",
+    "experiment_version": "v1.0.0"
+  },
+  "simulation": {
+    "mock_inference_latency_ms": 100,
+    "timeout_threshold_ms": 5000,
+    "retry_policy": {
+      "enabled": true,
+      "max_retries": 3
+    }
+  },
+  "failure_injection": {
+    "mode": "none",
+    "target_worker_id": null,
+    "straggler_delay_ms": 0
+  }
+}

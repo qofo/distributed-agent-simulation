@@ -20,10 +20,10 @@ def worker_task_a(chunk, adapter, config: GlobalConfig, logger: StructuredLogger
     logger.execution_start(trace_id, "master_worker", chunk_task_id, worker_id, "mock")
     if latency_sec > 0:
         time.sleep(latency_sec)
-    logger.execution_end(trace_id, "master_worker", chunk_task_id, worker_id, "mock", int(latency_sec * 1000))
-        
+    
     context = {"logger": logger, "trace_id": trace_id, "architecture": "master_worker", "worker_id": worker_id}
     res = adapter.process_chunk(chunk, context=context)
+    logger.execution_end(trace_id, "master_worker", chunk_task_id, worker_id, "mock", int(latency_sec * 1000))
     
     logger.inference_end(trace_id, "master_worker", chunk_task_id, worker_id, config.simulation.mock_inference_latency_ms)
     return res
@@ -42,10 +42,10 @@ def worker_task_b(state, adapter, config: GlobalConfig, logger: StructuredLogger
     logger.execution_start(trace_id, "master_worker", step_task_id, worker_id, "mock")
     if latency_sec > 0:
         time.sleep(latency_sec)
-    logger.execution_end(trace_id, "master_worker", step_task_id, worker_id, "mock", int(latency_sec * 1000))
         
     context = {"logger": logger, "trace_id": trace_id, "architecture": "master_worker", "worker_id": worker_id}
     new_state = adapter.process_step(state, context=context)
+    logger.execution_end(trace_id, "master_worker", step_task_id, worker_id, "mock", int(latency_sec * 1000))
     
     logger.inference_end(trace_id, "master_worker", step_task_id, worker_id, config.simulation.mock_inference_latency_ms)
     return new_state

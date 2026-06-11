@@ -36,10 +36,10 @@ def _agent_process_task_a(chunk, adapter, config, logger, run_id, trace_id, agen
     logger.execution_start(trace_id, "swarm", chunk_task_id, agent_id, "mock")
     if latency_sec > 0:
         time.sleep(latency_sec)
-    logger.execution_end(trace_id, "swarm", chunk_task_id, agent_id, "mock", int(latency_sec * 1000))
 
     context = {"logger": logger, "trace_id": trace_id, "architecture": "swarm", "worker_id": agent_id}
     res = adapter.process_chunk(chunk, context=context)
+    logger.execution_end(trace_id, "swarm", chunk_task_id, agent_id, "mock", int(latency_sec * 1000))
 
     logger.inference_end(trace_id, "swarm", chunk_task_id, agent_id, config.simulation.mock_inference_latency_ms)
     return res
@@ -154,10 +154,10 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
             logger.execution_start(trace_id, "swarm", step_task_id, current_agent, "mock")
             if latency_sec > 0:
                 time.sleep(latency_sec)
-            logger.execution_end(trace_id, "swarm", step_task_id, current_agent, "mock", int(latency_sec * 1000))
 
             context = {"logger": logger, "trace_id": trace_id, "architecture": "swarm", "worker_id": current_agent}
             state = adapter.process_step(state, context=context)
+            logger.execution_end(trace_id, "swarm", step_task_id, current_agent, "mock", int(latency_sec * 1000))
 
             logger.inference_end(trace_id, "swarm", step_task_id, current_agent, config.simulation.mock_inference_latency_ms)
 

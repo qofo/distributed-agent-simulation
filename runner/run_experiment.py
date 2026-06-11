@@ -61,6 +61,14 @@ async def execute_all_requests(run_func, config: GlobalConfig, logger: Structure
             
     await asyncio.gather(*tasks)
 
+import subprocess
+
+def get_git_commit():
+    try:
+        return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip()
+    except Exception:
+        return "unknown"
+
 def main():
     parser = argparse.ArgumentParser(description="Distributed Agent Simulation Runner")
     parser.add_argument("--config", type=str, required=True, help="Path to experiment config YAML")
@@ -81,15 +89,21 @@ def main():
         metadata = {
             "run_id": run_id,
             "start_time": datetime.now().isoformat(),
-            "config": {
-                "experiment": config.experiment.__dict__,
-                "workload": config.workload.__dict__,
-                "simulation": {
-                    "mock_inference_latency_ms": config.simulation.mock_inference_latency_ms,
-                    "timeout_threshold_ms": config.simulation.timeout_threshold_ms,
-                    "retry_policy": config.simulation.retry_policy.__dict__
-                },
-                "failure_injection": config.failure_injection.__dict__
+            "experiment": {
+                "task_type": config.experiment.task_type,
+                "worker_count": config.experiment.worker_count,
+                "git_commit": get_git_commit(),
+                "experiment_version": "v1.0.0"
+            },
+            "simulation": {
+                "mock_inference_latency_ms": config.simulation.mock_inference_latency_ms,
+                "timeout_threshold_ms": config.simulation.timeout_threshold_ms,
+                "retry_policy": config.simulation.retry_policy.__dict__
+            },
+            "failure_injection": {
+                "mode": config.failure_injection.mode,
+                "target_worker_id": config.failure_injection.target_worker_id,
+                "straggler_delay_ms": config.failure_injection.straggler_delay_ms
             }
         }
         with open(metadata_path, "w", encoding="utf-8") as f:

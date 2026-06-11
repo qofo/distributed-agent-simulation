@@ -35,10 +35,10 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                 logger.execution_start(trace_id, "monolithic", chunk_task_id, worker_id, "mock")
                 if latency_sec > 0:
                     time.sleep(latency_sec)
-                logger.execution_end(trace_id, "monolithic", chunk_task_id, worker_id, "mock", int(latency_sec * 1000))
                     
                 context = {"logger": logger, "trace_id": trace_id, "architecture": "monolithic", "worker_id": worker_id}
                 res = adapter.process_chunk(chunk, context=context)
+                logger.execution_end(trace_id, "monolithic", chunk_task_id, worker_id, "mock", int(latency_sec * 1000))
                 results.append(res)
                 
                 # End inference
@@ -77,10 +77,10 @@ def execute(config: GlobalConfig, logger: StructuredLogger, run_id: str, trace_i
                 logger.execution_start(trace_id, "monolithic", step_task_id, worker_id, "mock")
                 if latency_sec > 0:
                     time.sleep(latency_sec)
-                logger.execution_end(trace_id, "monolithic", step_task_id, worker_id, "mock", int(latency_sec * 1000))
                     
                 context = {"logger": logger, "trace_id": trace_id, "architecture": "monolithic", "worker_id": worker_id}
                 state = adapter.process_step(state, context=context)
+                logger.execution_end(trace_id, "monolithic", step_task_id, worker_id, "mock", int(latency_sec * 1000))
                 
                 # End inference
                 logger.inference_end(trace_id, "monolithic", step_task_id, worker_id, config.simulation.mock_inference_latency_ms)
