@@ -20,9 +20,8 @@ def generate_run_id(config: GlobalConfig) -> str:
 
 def setup_run_directories(run_id: str) -> dict:
     base_dir = Path(__file__).resolve().parent.parent
-    
-    run_log_dir = base_dir / "logs" / "runs" / run_id
-    run_result_dir = base_dir / "results" / "runs" / run_id
+    run_log_dir = base_dir / "result4" / "runs" / run_id
+    run_result_dir = base_dir / "result4" / "runs" / run_id
     
     run_log_dir.mkdir(parents=True, exist_ok=True)
     run_result_dir.mkdir(parents=True, exist_ok=True)
@@ -52,7 +51,8 @@ async def execute_all_requests(run_func, config: GlobalConfig, logger: Structure
     rps = config.workload.requests_per_second
     sleep_interval = 1.0 / rps if rps > 0 else 0
     
-    sem = asyncio.Semaphore(1)
+    concurrency = getattr(config.workload, "max_concurrent_requests", 100)
+    sem = asyncio.Semaphore(concurrency)
     tasks = []
     for i in range(total_requests):
         tasks.append(asyncio.create_task(run_single_request_with_sem(sem, run_func, config, logger, run_id, i)))

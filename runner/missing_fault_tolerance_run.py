@@ -10,18 +10,19 @@ CONFIG_TEMPLATE = {
     "experiment": {
         "name": "",
         "architecture": "",
-        "worker_count": 1,
+        "worker_count": 8,
         "task_type": "A"
     },
     "workload": {
-        "chunk_count": 4, # Smaller chunk count for real test
-        "dataset_path": "./data/dummy",
-        "total_requests": 2, # Small number of requests to save API Quota
-        "requests_per_second": 2.0
+        "chunk_count": 20,
+        "dataset_path": "./data/dummy.json",
+        "total_requests": 100,  # Same as stress test
+        "requests_per_second": 50.0,
+        "max_concurrent_requests": 50
     },
     "simulation": {
-        "mock_inference_latency_ms": 0,
-        "timeout_threshold_ms": 30000,
+        "mock_inference_latency_ms": 10,
+        "timeout_threshold_ms": 1000,
         "retry_policy": {"enabled": True, "max_retries": 3}
     },
     "failure_injection": {
@@ -33,35 +34,23 @@ CONFIG_TEMPLATE = {
 }
 
 MATRIX = [
-    # Task A (Map-Reduce)
-    {"arch": "monolithic", "task": "A", "workers": 1, "chunks": 4},
-    {"arch": "master_worker", "task": "A", "workers": 4, "chunks": 4},
-    {"arch": "master_worker", "task": "A", "workers": 8, "chunks": 4},
-    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 4},
-    {"arch": "queue_based", "task": "A", "workers": 8, "chunks": 4},
-    {"arch": "swarm", "task": "A", "workers": 4, "chunks": 4},
-    {"arch": "swarm", "task": "A", "workers": 8, "chunks": 4},
+    # Missing Straggler Tests
+    {"arch": "swarm", "task": "A", "workers": 8, "chunks": 20, "straggler_target": "swarm-agent-1", "straggler_delay": 500},
     
-    # Task B (Multi-hop QA)
-    {"arch": "monolithic", "task": "B", "workers": 1, "chunks": 4},
-    {"arch": "master_worker", "task": "B", "workers": 4, "chunks": 4},
-    {"arch": "queue_based", "task": "B", "workers": 4, "chunks": 4},
-    {"arch": "swarm", "task": "B", "workers": 4, "chunks": 4},
-    
-    # Fault Tolerance - Task A Crash
-    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 4, "crash_target": "random"},
+    # Missing Crash Tests
+    {"arch": "queue_based", "task": "A", "workers": 8, "chunks": 20, "crash_target": "queue-worker-1"},
+    {"arch": "swarm", "task": "A", "workers": 8, "chunks": 20, "crash_target": "swarm-agent-1"},
 ]
 
 def run_batch():
-    batch_id = f"real_batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    batch_dir = BASE_DIR / "result4" / "batches" / batch_id
+    batch_id = f"fault_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    batch_dir = BASE_DIR / "result5" / "fault" / batch_id
     batch_dir.mkdir(parents=True, exist_ok=True)
     
     temp_configs_dir = batch_dir / "configs"
     temp_configs_dir.mkdir(exist_ok=True)
     
-    print(f"Starting REAL API batch experiment: {batch_id}")
-    print(f"Total configurations to run: {len(MATRIX)}")
+    print(f"Starting Missing Fault Tolerance experiment: {batch_id}")
     
     run_log_info = []
     
@@ -70,18 +59,17 @@ def run_batch():
         task = params["task"]
         workers = params["workers"]
         
-        base_name = f"run_{idx:02d}_{arch}_T{task}_W{workers}"
+        base_name = f"fault_{idx:02d}_{arch}_T{task}_W{workers}"
         if "straggler_target" in params:
             base_name += "_straggler"
         elif "crash_target" in params:
             base_name += "_crash"
             
-        iterations = 2 # Reduced iterations to save quota
+        iterations = 1
         for i in range(iterations):
             name = f"{base_name}_iter{i}"
             
-            # Build Config
-            cfg = json.loads(json.dumps(CONFIG_TEMPLATE))  # Deep copy
+            cfg = json.loads(json.dumps(CONFIG_TEMPLATE))
             cfg["experiment"]["name"] = name
             cfg["experiment"]["architecture"] = arch
             cfg["experiment"]["task_type"] = task
@@ -102,7 +90,6 @@ def run_batch():
                 
             print(f"[{idx+1}/{len(MATRIX)} - Iter {i+1}/{iterations}] Executing {name} ...")
             
-            # Run subprocess
             runner_path = BASE_DIR / "runner" / "run_experiment.py"
             result = subprocess.run(
                 ["python", str(runner_path), "--config", str(cfg_path)],
@@ -129,7 +116,7 @@ def run_batch():
             else:
                 print(f"  -> Warning: Could not parse run_id for {name}")
             
-    print("\nBatch execution complete. Parsing metrics...")
+    print("\nFault execution complete. Parsing metrics...")
     summary_csv_path = batch_dir / "summary.csv"
     
     parser_path = BASE_DIR / "parser" / "metrics_parser.py"
@@ -146,10 +133,10 @@ def run_batch():
     print("\nGenerating report...")
     report_script_path = BASE_DIR / "reports" / "generate_summary.py"
     subprocess.run(
-        ["python", str(report_script_path), "--batch_dir", str(batch_dir), "--output_dir", "report_real_api"],
+        ["python", str(report_script_path), "--batch_dir", str(batch_dir), "--output_dir", "report5_fault"],
         cwd=str(BASE_DIR)
     )
-    print("Batch execution and reporting completed.")
+    print("Fault tolerance execution and reporting completed.")
 
 if __name__ == "__main__":
     run_batch()

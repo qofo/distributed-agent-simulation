@@ -31,11 +31,11 @@ CONFIG_TEMPLATE = {
 }
 
 # Sweep over latency to find where Monolithic (W=1) crosses Queue-Based (W=4)
-LATENCIES_MS = [10, 20, 50, 100, 200, 300, 500]
+LATENCIES_MS = [10, 50, 100, 300, 500, 1000, 2000]
 
 def run_sweep():
     batch_id = f"sweep_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    batch_dir = BASE_DIR / "results" / "sweeps" / batch_id
+    batch_dir = BASE_DIR / "result5" / "sweeps" / batch_id
     batch_dir.mkdir(parents=True, exist_ok=True)
     
     temp_configs_dir = batch_dir / "configs"
@@ -43,7 +43,7 @@ def run_sweep():
     
     print(f"Starting sweep experiment: {batch_id}")
     
-    run_log_dirs = []
+    run_log_info = []
     
     for lat in LATENCIES_MS:
         # Run Monolithic
@@ -77,20 +77,29 @@ def run_sweep():
                     break
                     
             if run_id:
-                run_log_dirs.append(BASE_DIR / "logs" / "runs" / run_id)
+                run_log_info.append((BASE_DIR / "result4" / "runs" / run_id, name))
             
     print("\nSweep execution complete. Parsing metrics...")
     summary_csv_path = batch_dir / "summary.csv"
     
     parser_path = BASE_DIR / "parser" / "metrics_parser.py"
-    for log_dir in run_log_dirs:
+    for log_dir, r_name in run_log_info:
         subprocess.run(
-            ["python", str(parser_path), "--log_dir", str(log_dir), "--output_csv", str(summary_csv_path)],
+            ["python", str(parser_path), "--log_dir", str(log_dir), "--output_csv", str(summary_csv_path), "--run_name", r_name],
             capture_output=True,
             cwd=str(BASE_DIR)
         )
         
+        
     print(f"Sweep summary generated at: {summary_csv_path}")
+    
+    print("\nGenerating sweep report...")
+    report_script_path = BASE_DIR / "reports" / "generate_sweep_report.py"
+    subprocess.run(
+        ["python", str(report_script_path), "--batch_dir", str(batch_dir), "--output_dir", "report5_sweep"],
+        cwd=str(BASE_DIR)
+    )
+    print("Sweep execution and reporting completed.")
 
 if __name__ == "__main__":
     run_sweep()

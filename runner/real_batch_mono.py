@@ -14,14 +14,14 @@ CONFIG_TEMPLATE = {
         "task_type": "A"
     },
     "workload": {
-        "chunk_count": 10,
-        "dataset_path": "./data/dummy.json",
-        "total_requests": 10,
-        "requests_per_second": 10.0
+        "chunk_count": 4, # Smaller chunk count for real test
+        "dataset_path": "./data/dummy",
+        "total_requests": 2, # Small number of requests to save API Quota
+        "requests_per_second": 2.0
     },
     "simulation": {
-        "mock_inference_latency_ms": 100,
-        "timeout_threshold_ms": 5000,
+        "mock_inference_latency_ms": 0,
+        "timeout_threshold_ms": 30000,
         "retry_policy": {"enabled": True, "max_retries": 3}
     },
     "failure_injection": {
@@ -34,51 +34,21 @@ CONFIG_TEMPLATE = {
 
 MATRIX = [
     # Task A (Map-Reduce)
-    {"arch": "monolithic", "task": "A", "workers": 1, "chunks": 64, "latency": 2000},
-    {"arch": "master_worker", "task": "A", "workers": 2, "chunks": 64, "latency": 2000},
-    {"arch": "master_worker", "task": "A", "workers": 4, "chunks": 64, "latency": 2000},
-    {"arch": "master_worker", "task": "A", "workers": 16, "chunks": 64, "latency": 2000},
-    {"arch": "master_worker", "task": "A", "workers": 32, "chunks": 64, "latency": 2000},
-    {"arch": "queue_based", "task": "A", "workers": 2, "chunks": 64, "latency": 2000},
-    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 64, "latency": 2000},
-    {"arch": "queue_based", "task": "A", "workers": 8, "chunks": 64, "latency": 2000},
-    {"arch": "queue_based", "task": "A", "workers": 16, "chunks": 64, "latency": 2000},
-    {"arch": "queue_based", "task": "A", "workers": 32, "chunks": 64, "latency": 2000},
-    {"arch": "swarm", "task": "A", "workers": 4, "chunks": 64, "latency": 2000},
-    {"arch": "swarm", "task": "A", "workers": 8, "chunks": 64, "latency": 2000},
-    {"arch": "swarm", "task": "A", "workers": 16, "chunks": 64, "latency": 2000},
-    {"arch": "swarm", "task": "A", "workers": 32, "chunks": 64, "latency": 2000},
+    {"arch": "monolithic", "task": "A", "workers": 1, "chunks": 4},
     
     # Task B (Multi-hop QA)
-    {"arch": "monolithic", "task": "B", "workers": 1, "chunks": 5, "latency": 2000},
-    {"arch": "master_worker", "task": "B", "workers": 2, "chunks": 5, "latency": 2000},
-    {"arch": "queue_based", "task": "B", "workers": 2, "chunks": 5, "latency": 2000},
-    {"arch": "swarm", "task": "B", "workers": 2, "chunks": 5, "latency": 2000},
-    
-    # Straggler (Failure Injection) - Task A (Diverse Delays)
-    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 64, "latency": 2000, "straggler_target": "queue-worker-1", "straggler_delay": 1000},
-    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 64, "latency": 2000, "straggler_target": "queue-worker-1", "straggler_delay": 3000},
-    
-    # Straggler (Failure Injection) - Task B
-    {"arch": "master_worker", "task": "B", "workers": 2, "chunks": 5, "latency": 2000, "straggler_target": "mw-worker-1", "straggler_delay": 3000},
-    {"arch": "queue_based", "task": "B", "workers": 2, "chunks": 5, "latency": 2000, "straggler_target": "queue-worker-1", "straggler_delay": 3000},
-    
-    # Crash (Failure Injection) - Task A (Target fixed)
-    {"arch": "master_worker", "task": "A", "workers": 4, "chunks": 64, "latency": 2000, "crash_target": "master-node"},
-    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 64, "latency": 2000, "crash_target": "orchestrator"},
-    {"arch": "master_worker", "task": "A", "workers": 4, "chunks": 64, "latency": 2000, "crash_target": "mw-worker-1"},
-    {"arch": "queue_based", "task": "A", "workers": 4, "chunks": 64, "latency": 2000, "crash_target": "queue-worker-1"},
+    {"arch": "monolithic", "task": "B", "workers": 1, "chunks": 4},
 ]
 
 def run_batch():
-    batch_id = f"batch_sim_v4_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    batch_id = f"real_batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     batch_dir = BASE_DIR / "result4" / "batches" / batch_id
     batch_dir.mkdir(parents=True, exist_ok=True)
     
     temp_configs_dir = batch_dir / "configs"
     temp_configs_dir.mkdir(exist_ok=True)
     
-    print(f"Starting batch experiment: {batch_id}")
+    print(f"Starting REAL API batch experiment: {batch_id}")
     print(f"Total configurations to run: {len(MATRIX)}")
     
     run_log_info = []
@@ -94,7 +64,7 @@ def run_batch():
         elif "crash_target" in params:
             base_name += "_crash"
             
-        iterations = params.get("iterations", 3)
+        iterations = 2 # Reduced iterations to save quota
         for i in range(iterations):
             name = f"{base_name}_iter{i}"
             
@@ -105,7 +75,6 @@ def run_batch():
             cfg["experiment"]["task_type"] = task
             cfg["experiment"]["worker_count"] = workers
             cfg["workload"]["chunk_count"] = params["chunks"]
-            cfg["simulation"]["mock_inference_latency_ms"] = params["latency"]
             
             if "straggler_target" in params:
                 cfg["failure_injection"]["mode"] = "straggler"
@@ -135,8 +104,6 @@ def run_batch():
                 print(result.stderr)
                 continue
                 
-            # Parse run_id from stdout
-            # Expecting line: INFO: Starting run <run_id> (Arch: ...)
             run_id = None
             for line in result.stdout.split('\n'):
                 if "INFO: Starting run " in line:
@@ -150,7 +117,6 @@ def run_batch():
             else:
                 print(f"  -> Warning: Could not parse run_id for {name}")
             
-    # Step 2: Parse all metrics and generate summary CSV
     print("\nBatch execution complete. Parsing metrics...")
     summary_csv_path = batch_dir / "summary.csv"
     
@@ -168,7 +134,7 @@ def run_batch():
     print("\nGenerating report...")
     report_script_path = BASE_DIR / "reports" / "generate_summary.py"
     subprocess.run(
-        ["python", str(report_script_path), "--batch_dir", str(batch_dir), "--output_dir", "report4"],
+        ["python", str(report_script_path), "--batch_dir", str(batch_dir), "--output_dir", "report_real_api"],
         cwd=str(BASE_DIR)
     )
     print("Batch execution and reporting completed.")
