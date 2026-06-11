@@ -1,0 +1,4 @@
+run_name,architecture,total_requests,completed_requests,total_duration_sec,throughput_req_per_sec,p50_latency_sec,p95_latency_sec,p99_latency_sec,avg_queue_wait_sec,retries,timeouts,crashes,api_429_errors,max_active_workers,avg_master_aggregation_duration_ms,avg_queue_lock_wait_ms
+fault_00_swarm_TA_W8_straggler,swarm,100,100,219.216909,0.456169190853795,21.7209355,22.5385113,22.5733734,0.0126606905,0,0,0,400,8,0.0,0.0
+fault_01_queue_based_TA_W8_crash,queue_based,100,194,1001.873332,0.1936372531373058,100.1713845,100.22402249999999,100.25601555000001,9.96955441835206,0,0,0,2664,7,0.0,18.956994206717845
+fault_02_swarm_TA_W8_crash,swarm,100,100,2.054592,48.67146372613151,0.0870265,0.09116869999999999,0.09703297,0.009033204,0,0,0,0,7,0.0,0.0

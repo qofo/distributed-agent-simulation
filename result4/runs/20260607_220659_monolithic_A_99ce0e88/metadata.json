@@ -1,0 +1,33 @@
+{
+  "run_id": "20260607_220659_monolithic_A_99ce0e88",
+  "start_time": "2026-06-07T22:06:59.454435",
+  "config": {
+    "experiment": {
+      "name": "mono_scale_05_monolithic_TA_W32_iter0",
+      "architecture": "monolithic",
+      "worker_count": 1,
+      "task_type": "A"
+    },
+    "workload": {
+      "chunk_count": 20,
+      "dataset_path": "./data/dummy.json",
+      "total_requests": 32,
+      "requests_per_second": 50.0,
+      "max_concurrent_requests": 32
+    },
+    "simulation": {
+      "mock_inference_latency_ms": 10,
+      "timeout_threshold_ms": 1000,
+      "retry_policy": {
+        "enabled": true,
+        "max_retries": 3
+      }
+    },
+    "failure_injection": {
+      "mode": "none",
+      "target_worker_id": null,
+      "timing_ms": 0,
+      "straggler_delay_ms": 0
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "run_id": "20260607_171233_queue_based_A_239d21a0",
+  "start_time": "2026-06-07T17:12:33.755388",
+  "config": {
+    "experiment": {
+      "name": "sweep_queue_based_W4_L1000",
+      "architecture": "queue_based",
+      "worker_count": 4,
+      "task_type": "A"
+    },
+    "workload": {
+      "chunk_count": 20,
+      "dataset_path": "./data/dummy.json",
+      "total_requests": 1,
+      "requests_per_second": 1.0,
+      "max_concurrent_requests": 100
+    },
+    "simulation": {
+      "mock_inference_latency_ms": 1000,
+      "timeout_threshold_ms": 5000,
+      "retry_policy": {
+        "enabled": true,
+        "max_retries": 3
+      }
+    },
+    "failure_injection": {
+      "mode": "none",
+      "target_worker_id": null,
+      "timing_ms": 0,
+      "straggler_delay_ms": 0
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "run_id": "20260607_232543_swarm_B_402a0f45",
+  "start_time": "2026-06-07T23:25:43.543801",
+  "config": {
+    "experiment": {
+      "name": "run_swarm_W4",
+      "architecture": "swarm",
+      "worker_count": 4,
+      "task_type": "B"
+    },
+    "workload": {
+      "chunk_count": 10,
+      "dataset_path": "./data/dummy.json",
+      "total_requests": 3,
+      "requests_per_second": 5.0,
+      "max_concurrent_requests": 100
+    },
+    "simulation": {
+      "mock_inference_latency_ms": 100,
+      "timeout_threshold_ms": 5000,
+      "retry_policy": {
+        "enabled": true,
+        "max_retries": 3
+      }
+    },
+    "failure_injection": {
+      "mode": "none",
+      "target_worker_id": null,
+      "timing_ms": 0,
+      "straggler_delay_ms": 0
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "run_id": "20260607_165924_swarm_A_ce9274f5",
+  "start_time": "2026-06-07T16:59:24.195893",
+  "config": {
+    "experiment": {
+      "name": "stress_02_swarm_TA_W8_iter0",
+      "architecture": "swarm",
+      "worker_count": 8,
+      "task_type": "A"
+    },
+    "workload": {
+      "chunk_count": 40,
+      "dataset_path": "./data/dummy.json",
+      "total_requests": 200,
+      "requests_per_second": 50.0
+    },
+    "simulation": {
+      "mock_inference_latency_ms": 50,
+      "timeout_threshold_ms": 5000,
+      "retry_policy": {
+        "enabled": true,
+        "max_retries": 3
+      }
+    },
+    "failure_injection": {
+      "mode": "none",
+      "target_worker_id": null,
+      "timing_ms": 0,
+      "straggler_delay_ms": 0
+    }
+  }
+}

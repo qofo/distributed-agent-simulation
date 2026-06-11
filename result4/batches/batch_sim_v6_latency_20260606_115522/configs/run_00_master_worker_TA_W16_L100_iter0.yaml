@@ -1,0 +1,21 @@
+experiment:
+  architecture: master_worker
+  name: run_00_master_worker_TA_W16_L100_iter0
+  task_type: A
+  worker_count: 16
+failure_injection:
+  mode: none
+  straggler_delay_ms: 0
+  target_worker_id: null
+  timing_ms: 0
+simulation:
+  mock_inference_latency_ms: 100
+  retry_policy:
+    enabled: true
+    max_retries: 3
+  timeout_threshold_ms: 5000
+workload:
+  chunk_count: 64
+  dataset_path: ./data/dummy.json
+  requests_per_second: 10.0
+  total_requests: 10

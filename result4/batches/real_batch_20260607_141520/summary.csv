@@ -1,0 +1,5 @@
+run_name,architecture,total_requests,completed_requests,total_duration_sec,throughput_req_per_sec,p50_latency_sec,p95_latency_sec,p99_latency_sec,avg_queue_wait_sec,retries,timeouts,crashes,api_429_errors,max_active_workers
+run_00_monolithic_TA_W1,monolithic,2,2,0.972969,2.0555639491083477,0.467634,0.4697454,0.46993308,0.0,0,0,0,0,1
+run_00_monolithic_TA_W1,monolithic,2,2,0.797855,2.506721146072908,0.398428,0.694105,0.7203873999999999,0.0,0,0,0,0,1
+run_01_monolithic_TB_W1,monolithic,2,2,0.846065,2.363884571516373,0.31764749999999997,0.40606305,0.4139222099999999,0.0,0,0,0,0,1
+run_01_monolithic_TB_W1,monolithic,2,2,0.853049,2.3445312051242078,0.32936299999999996,0.38527729999999993,0.3902474600000001,0.0,0,0,0,0,1

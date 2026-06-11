@@ -1,0 +1,33 @@
+{
+  "run_id": "20260607_221520_queue_based_A_903ddc61",
+  "start_time": "2026-06-07T22:15:20.690081",
+  "config": {
+    "experiment": {
+      "name": "fault_01_queue_based_TA_W8_crash_iter0",
+      "architecture": "queue_based",
+      "worker_count": 8,
+      "task_type": "A"
+    },
+    "workload": {
+      "chunk_count": 20,
+      "dataset_path": "./data/dummy.json",
+      "total_requests": 100,
+      "requests_per_second": 50.0,
+      "max_concurrent_requests": 50
+    },
+    "simulation": {
+      "mock_inference_latency_ms": 10,
+      "timeout_threshold_ms": 1000,
+      "retry_policy": {
+        "enabled": true,
+        "max_retries": 3
+      }
+    },
+    "failure_injection": {
+      "mode": "crash",
+      "target_worker_id": "queue-worker-1",
+      "timing_ms": 0,
+      "straggler_delay_ms": 0
+    }
+  }
+}

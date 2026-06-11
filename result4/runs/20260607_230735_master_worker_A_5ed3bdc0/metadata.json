@@ -1,0 +1,33 @@
+{
+  "run_id": "20260607_230735_master_worker_A_5ed3bdc0",
+  "start_time": "2026-06-07T23:07:35.867370",
+  "config": {
+    "experiment": {
+      "name": "run_missing_master_worker_TA_W8_trial2",
+      "architecture": "master_worker",
+      "worker_count": 8,
+      "task_type": "A"
+    },
+    "workload": {
+      "chunk_count": 64,
+      "dataset_path": "./data/dummy.json",
+      "total_requests": 10,
+      "requests_per_second": 10.0,
+      "max_concurrent_requests": 100
+    },
+    "simulation": {
+      "mock_inference_latency_ms": 2000,
+      "timeout_threshold_ms": 5000,
+      "retry_policy": {
+        "enabled": true,
+        "max_retries": 3
+      }
+    },
+    "failure_injection": {
+      "mode": "none",
+      "target_worker_id": null,
+      "timing_ms": 0,
+      "straggler_delay_ms": 0
+    }
+  }
+}
