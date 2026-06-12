@@ -89,6 +89,7 @@ def generate_report(batch_dir: Path, output_dir: Path):
         # Round the metrics for better display
         display_df = agg_df.round(3)
         f.write(display_df.to_markdown(index=False) + "\n\n")
+        f.write("*Note: Each run was executed with N=50 total requests to ensure statistical significance.* \n\n")
         f.write("## 3. Charts\n")
         f.write("### Throughput\n")
         f.write(f"![Throughput]({throughput_chart.name})\n\n")

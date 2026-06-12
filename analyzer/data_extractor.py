@@ -28,8 +28,8 @@ def extract_metrics_from_log(log_path):
 
     events.sort(key=lambda x: x.get('timestamp', ''))
 
-    system_start_ts = None
-    system_end_ts = None
+    system_start_ts = parse_isoformat(events[0].get('timestamp'))
+    system_end_ts = parse_isoformat(events[-1].get('timestamp'))
     worker_states = {}
 
     for event in events:
@@ -39,11 +39,6 @@ def extract_metrics_from_log(log_path):
 
         evt_type = event.get('event_type')
         worker_id = event.get('worker_id')
-
-        if evt_type == 'SYSTEM_START':
-            system_start_ts = ts
-        elif evt_type == 'SYSTEM_END':
-            system_end_ts = ts
             
         if evt_type == 'WORKER_STATE' and worker_id:
             state = event.get('details', {}).get('state')

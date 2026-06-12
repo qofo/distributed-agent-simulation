@@ -144,6 +144,9 @@ class StructuredLogger:
     def profiling(self, trace_id: str, architecture: str, metric_name: str, value_ms: float, worker_id: Optional[str] = None):
         self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id="profiling", event_type=EventType.PROFILING, worker_id=worker_id, details={"metric": metric_name, "value_ms": value_ms}))
 
+    def llm_response(self, trace_id: str, architecture: str, task_id: str, worker_id: str, prompt: str, response: str):
+        self.log_event(LogEvent(trace_id=trace_id, architecture=architecture, task_id=task_id, event_type=EventType.LLM_RESPONSE, worker_id=worker_id, details={"prompt": prompt, "response": response}))
+
     def worker_state(self, trace_id: str, architecture: str, worker_id: str, state: str, details: Optional[Dict[str, Any]] = None):
         det = details or {}
         det["state"] = state

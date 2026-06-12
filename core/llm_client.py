@@ -80,9 +80,22 @@ def _generate_content_with_backoff(model: str, contents: Any, config: Any = None
     client = key_manager.get_client()
     try:
         if config:
-            return client.models.generate_content(model=model, contents=contents, config=config)
+            response = client.models.generate_content(model=model, contents=contents, config=config)
         else:
-            return client.models.generate_content(model=model, contents=contents)
+            response = client.models.generate_content(model=model, contents=contents)
+            
+        if context and "logger" in context:
+            logger = context["logger"]
+            ans = response.text.strip() if response and hasattr(response, "text") and response.text else ""
+            logger.llm_response(
+                trace_id=context.get("trace_id", "unknown"),
+                architecture=context.get("architecture", "unknown"),
+                task_id=context.get("task_id", "llm-call"),
+                worker_id=context.get("worker_id", "unknown"),
+                prompt=str(contents),
+                response=ans
+            )
+        return response
     except errors.APIError as e:
         if e.code == 429:
             # 429 Resource Exhausted / Quota Exceeded. Rotate key and raise so Tenacity retries.

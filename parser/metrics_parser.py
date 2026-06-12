@@ -251,10 +251,13 @@ def compute_metrics(log_file: Path, run_name: str) -> Dict[str, Any]:
         "avg_queue_lock_wait_ms": statistics.mean(profiling_data["queue_lock_wait_ms"]) if "queue_lock_wait_ms" in profiling_data and profiling_data["queue_lock_wait_ms"] else 0.0,
         "utilization_busy": utilization_busy,
         "utilization_idle": utilization_idle,
-        "utilization_blocked": utilization_blocked
+        "utilization_blocked": utilization_blocked,
+        "avg_dispatch_master_worker_submit_sec": avg_dispatch_times.get("avg_dispatch_master_worker_submit_sec", 0.0),
+        "avg_dispatch_queue_publish_sec": avg_dispatch_times.get("avg_dispatch_queue_publish_sec", 0.0),
+        "avg_dispatch_swarm_route_sec": avg_dispatch_times.get("avg_dispatch_swarm_route_sec", 0.0),
+        "avg_dispatch_monolithic_sec": avg_dispatch_times.get("avg_dispatch_monolithic_sec", 0.0)
     }
     
-    result.update(avg_dispatch_times)
     return result
 
 def write_csv_summary(metrics: Dict[str, Any], output_path: Path):

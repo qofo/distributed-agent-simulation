@@ -16,7 +16,7 @@ CONFIG_TEMPLATE = {
     "workload": {
         "chunk_count": 4, # Smaller chunk count for real test
         "dataset_path": "./data/dummy",
-        "total_requests": 2, # Small number of requests to save API Quota
+        "total_requests": 50, # Increased requests to reduce API noise and improve stability
         "requests_per_second": 2.0
     },
     "simulation": {
@@ -76,7 +76,7 @@ def run_batch():
         elif "crash_target" in params:
             base_name += "_crash"
             
-        iterations = 2 # Reduced iterations to save quota
+        iterations = 1 # User requested 1 iteration to save quota
         for i in range(iterations):
             name = f"{base_name}_iter{i}"
             
