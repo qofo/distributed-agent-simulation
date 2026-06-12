@@ -90,9 +90,9 @@ def compute_stats(durations: list) -> dict:
         "is_stable_cv10": cv < 0.10,
         "is_acceptable_cv20": cv < 0.20,
         "recommendation": (
-            "STABLE — 5회 반복으로 충분" if cv < 0.10
-            else "CAUTION — 10회 이상 반복 권장" if cv < 0.20
-            else "DANGER — 실험 조건 재검토 필요 (Mock latency 고정, 스레드 수 조정 등)"
+            "STABLE: 5 runs sufficient" if cv < 0.10
+            else "CAUTION: 10+ runs recommended" if cv < 0.20
+            else "DANGER: Review experiment conditions (fix mock latency, thread count, etc.)"
         )
     }
 
@@ -145,7 +145,7 @@ def main():
         print(f"  std   : {stats['std_sec']:.4f}s")
         print(f"  CV    : {stats['cv_pct']:.1f}%")
         print(f"  95% CI: [{stats['ci_95_lower']:.4f}, {stats['ci_95_upper']:.4f}]")
-        print(f"  판정  : {stats['recommendation']}")
+        print(f"  Judgment: {stats['recommendation']}")
 
     # Overhead analysis (compare-all mode)
     if args.compare_all and "normal" in results and "null" in results:
@@ -165,11 +165,11 @@ def main():
         if disabled_mean:
             print(f"  Disabled 로거 평균   : {disabled_mean:.4f}s")
         print(f"  NullLogger 평균      : {null_mean:.4f}s")
-        print(f"  ────────────────────────────────────")
-        print(f"  전체 로깅 오버헤드   : {total_overhead:.4f}s ({total_overhead/normal_mean*100:.1f}%)")
+        print(f"  ------------------------------------")
+        print(f"  Total logging overhead  : {total_overhead:.4f}s ({total_overhead/normal_mean*100:.1f}%)")
         if io_overhead is not None:
-            print(f"    ├ I/O 오버헤드     : {io_overhead:.4f}s ({io_overhead/normal_mean*100:.1f}%)")
-            print(f"    └ 호출 오버헤드    : {call_overhead:.4f}s ({call_overhead/normal_mean*100:.1f}%)")
+            print(f"    +- I/O overhead       : {io_overhead:.4f}s ({io_overhead/normal_mean*100:.1f}%)")
+            print(f"    +- Call overhead      : {call_overhead:.4f}s ({call_overhead/normal_mean*100:.1f}%)")
 
         results["_overhead_analysis"] = {
             "total_overhead_sec": round(total_overhead, 4),
@@ -179,8 +179,8 @@ def main():
         }
 
         print()
-        print("  ⚠️  판단 기준: 아키텍처 간 레이턴시 차이 대비 오버헤드 차이 비율이 20% 초과 시 비동기 로거 검토")
-        print("  (이 수치 단독으로는 판단 불가. 아키텍처 간 레이턴시 차이와 함께 계산할 것)")
+        print("  NOTE: Threshold = (max arch overhead - min arch overhead) / arch latency diff > 20% -> consider async logger")
+        print("  (This number alone is not enough. Compare with inter-architecture latency difference.)")
 
     if args.output:
         out_path = Path(args.output)
