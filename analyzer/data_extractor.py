@@ -21,21 +21,16 @@ def extract_metrics_from_log(log_path):
                 if line.strip():
                     events.append(json.loads(line))
     except Exception as e:
-        print(f"Error reading {log_path}: {e}")
         return None
 
     if not events:
         return None
 
-    # Sort by timestamp
     events.sort(key=lambda x: x.get('timestamp', ''))
 
-    config = None
     system_start_ts = None
     system_end_ts = None
-    
-    # Track states for utilization
-    worker_states = {} # worker_id -> { 'last_ts': ts, 'state': state, 'busy_time': 0, 'idle_time': 0, 'blocked_time': 0 }
+    worker_states = {}
 
     for event in events:
         ts = parse_isoformat(event.get('timestamp'))
@@ -47,7 +42,6 @@ def extract_metrics_from_log(log_path):
 
         if evt_type == 'SYSTEM_START':
             system_start_ts = ts
-            config = event.get('details', {}).get('config', {})
         elif evt_type == 'SYSTEM_END':
             system_end_ts = ts
             
@@ -63,35 +57,53 @@ def extract_metrics_from_log(log_path):
                 prev['state'] = state
                 prev['last_ts'] = ts
 
-    if not config or not system_start_ts or not system_end_ts:
+    metadata_path = Path(log_path).parent / "metadata.json"
+    if not metadata_path.exists():
+        return None
+        
+    try:
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+    except:
         return None
 
-    # Finalize worker states up to system_end
+    task_type = metadata.get('experiment', {}).get('task_type')
+    if not task_type:
+        return None 
+        
+    run_id = metadata.get('run_id', '')
+    if '_monolithic_' in run_id:
+        arch = 'monolithic'
+    elif '_master_worker_' in run_id:
+        arch = 'master_worker'
+    elif '_queue_based_' in run_id:
+        arch = 'queue_based'
+    elif '_swarm_' in run_id:
+        arch = 'swarm'
+    else:
+        return None
+        
+    failure_mode = metadata.get('failure_injection', {}).get('mode', 'none')
+
+    if not system_start_ts or not system_end_ts:
+        return None
+
     for worker_id, prev in worker_states.items():
         if prev['state'] in ['busy', 'idle', 'blocked']:
             duration = system_end_ts - prev['last_ts']
             if duration > 0:
                 prev[prev['state']] += duration
 
-    # Aggregate utilization
     total_busy = sum(w['busy'] for w in worker_states.values())
     total_idle = sum(w['idle'] for w in worker_states.values())
     total_blocked = sum(w['blocked'] for w in worker_states.values())
     
     total_worker_time = total_busy + total_idle + total_blocked
     if total_worker_time == 0:
-        total_worker_time = 1.0 # prevent div by zero
+        total_worker_time = 1.0
 
-    exp_name = config.get('experiment', {}).get('name', '')
-    if not exp_name.startswith('full_'):
-        return None # Ignore logs that are not from run_all_experiments.py
-        
-    arch = config['experiment']['architecture']
-    task_type = config['experiment']['task_type']
-    failure_mode = config['failure_injection']['mode']
-    
     return {
-        'exp_name': exp_name,
+        'exp_name': run_id,
         'architecture': arch,
         'task_type': task_type,
         'failure_mode': failure_mode,
@@ -102,14 +114,14 @@ def extract_metrics_from_log(log_path):
     }
 
 def main():
-    logs_dir = Path("logs/runs")
+    logs_dir = Path("result4/runs")
     results = []
     
     if not logs_dir.exists():
         print(f"Directory {logs_dir} not found.")
         return
 
-    print("Extracting data from logs...")
+    print(f"Extracting data from {logs_dir}...")
     for run_dir in os.listdir(logs_dir):
         log_path = logs_dir / run_dir / "events.jsonl"
         if log_path.exists():
@@ -118,12 +130,11 @@ def main():
                 results.append(metrics)
                 
     if not results:
-        print("No valid 'full_*' experiment logs found.")
+        print("No valid experiment logs found.")
         return
 
     df = pd.DataFrame(results)
     
-    # Aggregate (mean) across the N runs
     summary_df = df.groupby(['architecture', 'task_type', 'failure_mode']).agg({
         'wall_clock_time': ['mean', 'std', 'count'],
         'util_busy_pct': 'mean',
@@ -131,7 +142,6 @@ def main():
         'util_blocked_pct': 'mean'
     }).reset_index()
     
-    # Flatten multi-level columns
     summary_df.columns = ['_'.join(col).strip('_') for col in summary_df.columns.values]
     
     out_dir = Path("results/final")
