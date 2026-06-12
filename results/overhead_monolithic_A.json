@@ -1,0 +1,54 @@
+{
+  "config": "configs/example.yaml",
+  "timestamp": "2026-06-12T01:22:32.528909",
+  "results": {
+    "normal": {
+      "n": 5,
+      "mean_sec": 9.6487,
+      "std_sec": 0.8937,
+      "cv": 0.0926,
+      "cv_pct": 9.26,
+      "min_sec": 8.7476,
+      "max_sec": 10.9583,
+      "ci_95_lower": 9.004,
+      "ci_95_upper": 10.354,
+      "is_stable_cv10": true,
+      "is_acceptable_cv20": true,
+      "recommendation": "STABLE: 5 runs sufficient"
+    },
+    "disabled": {
+      "n": 5,
+      "mean_sec": 9.6839,
+      "std_sec": 1.0641,
+      "cv": 0.1099,
+      "cv_pct": 10.99,
+      "min_sec": 8.707,
+      "max_sec": 10.9681,
+      "ci_95_lower": 8.8936,
+      "ci_95_upper": 10.4752,
+      "is_stable_cv10": false,
+      "is_acceptable_cv20": true,
+      "recommendation": "CAUTION: 10+ runs recommended"
+    },
+    "null": {
+      "n": 5,
+      "mean_sec": 9.511,
+      "std_sec": 0.9828,
+      "cv": 0.1033,
+      "cv_pct": 10.33,
+      "min_sec": 8.7036,
+      "max_sec": 10.6496,
+      "ci_95_lower": 8.7665,
+      "ci_95_upper": 10.283,
+      "is_stable_cv10": false,
+      "is_acceptable_cv20": true,
+      "recommendation": "CAUTION: 10+ runs recommended"
+    },
+    "_overhead_analysis": {
+      "total_overhead_sec": 0.1377,
+      "io_overhead_sec": -0.0352,
+      "call_overhead_sec": 0.1729,
+      "total_overhead_pct_of_runtime": 1.43
+    }
+  }
+}

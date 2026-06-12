@@ -1,0 +1,30 @@
+{
+  "run_id": "20260602_165718_monolithic_A_a7cc10fd",
+  "start_time": "2026-06-02T16:57:18.630277",
+  "config": {
+    "experiment": {
+      "name": "sweep_monolithic_W1_L50",
+      "architecture": "monolithic",
+      "worker_count": 1,
+      "task_type": "A"
+    },
+    "workload": {
+      "chunk_count": 20,
+      "dataset_path": "./data/dummy.json"
+    },
+    "simulation": {
+      "mock_inference_latency_ms": 50,
+      "timeout_threshold_ms": 5000,
+      "retry_policy": {
+        "enabled": true,
+        "max_retries": 3
+      }
+    },
+    "failure_injection": {
+      "mode": "none",
+      "target_worker_id": null,
+      "timing_ms": 0,
+      "straggler_delay_ms": 0
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "run_id": "20260612_205002_master_worker_A_2e84778d",
+  "start_time": "2026-06-12T20:50:02.090597",
+  "experiment": {
+    "task_type": "A",
+    "worker_count": 4,
+    "git_commit": "ea3c4209d42a12950ed97f656307efe994a857dc",
+    "experiment_version": "v1.0.0"
+  },
+  "simulation": {
+    "mock_inference_latency_ms": 200,
+    "timeout_threshold_ms": 5000,
+    "retry_policy": {
+      "enabled": true,
+      "max_retries": 3
+    }
+  },
+  "failure_injection": {
+    "mode": "crash",
+    "target_worker_id": "worker-2",
+    "straggler_delay_ms": 0
+  }
+}

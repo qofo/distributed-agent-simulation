@@ -1,0 +1,19 @@
+experiment:
+  architecture: monolithic
+  name: run_05_monolithic_TB_W1
+  task_type: B
+  worker_count: 1
+failure_injection:
+  mode: none
+  straggler_delay_ms: 0
+  target_worker_id: null
+  timing_ms: 0
+simulation:
+  mock_inference_latency_ms: 100
+  retry_policy:
+    enabled: true
+    max_retries: 3
+  timeout_threshold_ms: 5000
+workload:
+  chunk_count: 5
+  dataset_path: ./data/dummy.json

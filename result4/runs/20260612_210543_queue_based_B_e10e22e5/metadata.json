@@ -1,0 +1,23 @@
+{
+  "run_id": "20260612_210543_queue_based_B_e10e22e5",
+  "start_time": "2026-06-12T21:05:43.715492",
+  "experiment": {
+    "task_type": "B",
+    "worker_count": 4,
+    "git_commit": "7f301a498522f9de70170579b0aeb036b2c558be",
+    "experiment_version": "v1.0.0"
+  },
+  "simulation": {
+    "mock_inference_latency_ms": 200,
+    "timeout_threshold_ms": 5000,
+    "retry_policy": {
+      "enabled": true,
+      "max_retries": 3
+    }
+  },
+  "failure_injection": {
+    "mode": "straggler",
+    "target_worker_id": "queue-worker-2",
+    "straggler_delay_ms": 500
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "run_id": "20260602_144134_master_worker_A_b230b367",
+  "start_time": "2026-06-02T14:41:34.693185",
+  "config": {
+    "experiment": {
+      "name": "run_02_master_worker_TA_W4",
+      "architecture": "master_worker",
+      "worker_count": 4,
+      "task_type": "A"
+    },
+    "workload": {
+      "chunk_count": 20,
+      "dataset_path": "./data/dummy.json"
+    },
+    "simulation": {
+      "mock_inference_latency_ms": 50,
+      "timeout_threshold_ms": 5000,
+      "retry_policy": {
+        "enabled": true,
+        "max_retries": 3
+      }
+    },
+    "failure_injection": {
+      "mode": "none",
+      "target_worker_id": null,
+      "timing_ms": 0,
+      "straggler_delay_ms": 0
+    }
+  }
+}

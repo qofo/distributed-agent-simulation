@@ -1,0 +1,54 @@
+{
+  "config": "configs/temp_runs/test_swarm.yaml",
+  "timestamp": "2026-06-12T01:30:18.574058",
+  "results": {
+    "normal": {
+      "n": 5,
+      "mean_sec": 7.276,
+      "std_sec": 0.6223,
+      "cv": 0.0855,
+      "cv_pct": 8.55,
+      "min_sec": 6.8293,
+      "max_sec": 8.3105,
+      "ci_95_lower": 6.8702,
+      "ci_95_upper": 7.7795,
+      "is_stable_cv10": true,
+      "is_acceptable_cv20": true,
+      "recommendation": "STABLE: 5 runs sufficient"
+    },
+    "disabled": {
+      "n": 5,
+      "mean_sec": 7.6807,
+      "std_sec": 0.8653,
+      "cv": 0.1127,
+      "cv_pct": 11.27,
+      "min_sec": 6.9073,
+      "max_sec": 8.6595,
+      "ci_95_lower": 7.0031,
+      "ci_95_upper": 8.3582,
+      "is_stable_cv10": false,
+      "is_acceptable_cv20": true,
+      "recommendation": "CAUTION: 10+ runs recommended"
+    },
+    "null": {
+      "n": 5,
+      "mean_sec": 8.5896,
+      "std_sec": 1.4976,
+      "cv": 0.1744,
+      "cv_pct": 17.44,
+      "min_sec": 6.8131,
+      "max_sec": 10.9671,
+      "ci_95_lower": 7.6439,
+      "ci_95_upper": 9.872,
+      "is_stable_cv10": false,
+      "is_acceptable_cv20": true,
+      "recommendation": "CAUTION: 10+ runs recommended"
+    },
+    "_overhead_analysis": {
+      "total_overhead_sec": -1.3136,
+      "io_overhead_sec": -0.4047,
+      "call_overhead_sec": -0.9089,
+      "total_overhead_pct_of_runtime": -18.05
+    }
+  }
+}

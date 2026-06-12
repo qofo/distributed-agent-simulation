@@ -1,0 +1,30 @@
+{
+  "run_id": "20260602_152914_swarm_B_b55c4b3a",
+  "start_time": "2026-06-02T15:29:14.934893",
+  "config": {
+    "experiment": {
+      "name": "run_13_swarm_TB_W2",
+      "architecture": "swarm",
+      "worker_count": 2,
+      "task_type": "B"
+    },
+    "workload": {
+      "chunk_count": 5,
+      "dataset_path": "./data/dummy.json"
+    },
+    "simulation": {
+      "mock_inference_latency_ms": 100,
+      "timeout_threshold_ms": 5000,
+      "retry_policy": {
+        "enabled": true,
+        "max_retries": 3
+      }
+    },
+    "failure_injection": {
+      "mode": "none",
+      "target_worker_id": null,
+      "timing_ms": 0,
+      "straggler_delay_ms": 0
+    }
+  }
+}

@@ -423,8 +423,6 @@ __marimo__/
 
 # Auto-generated experiment outputs
 logs/
-results/
-result4/
 
 # Temporary configs
 configs/temp_runs/

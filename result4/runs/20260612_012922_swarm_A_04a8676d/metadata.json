@@ -1,0 +1,23 @@
+{
+  "run_id": "20260612_012922_swarm_A_04a8676d",
+  "start_time": "2026-06-12T01:29:22.045918",
+  "experiment": {
+    "task_type": "A",
+    "worker_count": 4,
+    "git_commit": "688b3969d0b64d6012c746ede4a7419bcce4cc55",
+    "experiment_version": "v1.0.0"
+  },
+  "simulation": {
+    "mock_inference_latency_ms": 200,
+    "timeout_threshold_ms": 5000,
+    "retry_policy": {
+      "enabled": true,
+      "max_retries": 3
+    }
+  },
+  "failure_injection": {
+    "mode": "none",
+    "target_worker_id": null,
+    "straggler_delay_ms": 0
+  }
+}

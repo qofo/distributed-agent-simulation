@@ -1,0 +1,21 @@
+experiment:
+  architecture: swarm
+  name: run_17_swarm_TB_W2_iter1
+  task_type: B
+  worker_count: 2
+failure_injection:
+  mode: none
+  straggler_delay_ms: 0
+  target_worker_id: null
+  timing_ms: 0
+simulation:
+  mock_inference_latency_ms: 2000
+  retry_policy:
+    enabled: true
+    max_retries: 3
+  timeout_threshold_ms: 5000
+workload:
+  chunk_count: 5
+  dataset_path: ./data/dummy.json
+  requests_per_second: 10.0
+  total_requests: 10

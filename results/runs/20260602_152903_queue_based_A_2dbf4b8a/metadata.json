@@ -1,0 +1,30 @@
+{
+  "run_id": "20260602_152903_queue_based_A_2dbf4b8a",
+  "start_time": "2026-06-02T15:29:03.784740",
+  "config": {
+    "experiment": {
+      "name": "run_03_queue_based_TA_W2",
+      "architecture": "queue_based",
+      "worker_count": 2,
+      "task_type": "A"
+    },
+    "workload": {
+      "chunk_count": 20,
+      "dataset_path": "./data/dummy.json"
+    },
+    "simulation": {
+      "mock_inference_latency_ms": 50,
+      "timeout_threshold_ms": 5000,
+      "retry_policy": {
+        "enabled": true,
+        "max_retries": 3
+      }
+    },
+    "failure_injection": {
+      "mode": "none",
+      "target_worker_id": null,
+      "timing_ms": 0,
+      "straggler_delay_ms": 0
+    }
+  }
+}
