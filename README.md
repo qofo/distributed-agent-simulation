@@ -160,3 +160,143 @@ python parser/metrics_parser.py
 ### 6. Analyze results
 
 Use the analysis scripts under `analyzer/` to generate figures and summary statistics from the parsed metrics.
+
+---
+
+## Repository Structure
+
+```text
+distributed-agent-simulation/
+├── architectures/      # Multi-agent orchestration implementations
+├── core/               # Shared runtime components
+├── workloads/          # Experimental workloads
+├── runner/             # Experiment entry points
+├── parser/             # Log parsing and metric extraction
+├── analyzer/           # Result analysis and visualization
+├── configs/            # YAML experiment configurations
+├── mock_llm/           # Mock inference server
+├── data/               # Input datasets
+├── reports/            # Generated reports and figures
+└── result4/            # Experiment outputs
+```
+
+| Directory | Purpose |
+|-----------|---------|
+| `architectures/` | Implementations of the four orchestration strategies |
+| `core/` | Configuration, logging, LLM client, and shared utilities |
+| `workloads/` | Task definitions executed by every architecture |
+| `runner/` | Scripts for running experiments |
+| `parser/` | Converts JSONL logs into structured metrics |
+| `analyzer/` | Generates figures and higher-level analyses |
+| `configs/` | Experiment configuration files |
+| `reports/` | Report generation scripts and figures |
+| `result4/` | Default output directory for experiment results |
+
+---
+
+## Architecture Comparison
+
+Each architecture executes the same workload but differs in how work is coordinated.
+
+| Architecture | Coordination | Parallel | Primary Focus |
+|--------------|-------------|----------|---------------|
+| **Monolithic** | Single worker | No | Baseline |
+| **Master–Worker** | Central coordinator | Yes | Coordination overhead |
+| **Queue-Based** | Producer–consumer queues | Yes | Queue behavior |
+| **Swarm** | Decentralized handoff | Yes | Peer-to-peer coordination |
+
+### Monolithic
+
+A sequential baseline without coordination overhead.
+
+- Simple execution model
+- No parallelism
+- Used as the reference architecture
+
+### Master–Worker
+
+A centralized coordinator distributes work to multiple workers.
+
+- Efficient for parallel workloads
+- Aggregation performed by the master
+- Coordinator may become a bottleneck
+
+### Queue-Based
+
+Tasks are exchanged through producer–consumer queues.
+
+- Asynchronous execution
+- Loose coupling between workers
+- Additional queue management overhead
+
+### Swarm
+
+Workers exchange tasks directly using predefined routing rules.
+
+- No centralized coordinator
+- Peer-to-peer task handoff
+- Static routing strategy
+
+---
+
+## Example Experiment Workflow
+
+A typical experiment consists of only a few steps.
+
+```text
+Edit Configuration
+        │
+        ▼
+Run Experiment
+        │
+        ▼
+Generate JSONL Logs
+        │
+        ▼
+Parse Metrics
+        │
+        ▼
+Analyze Results
+        │
+        ▼
+Generate Figures
+```
+
+Because logs are stored separately from analysis results, additional metrics can be generated later without rerunning the experiment.
+
+---
+
+## Experimental Results
+
+The accompanying report evaluates the framework using four orchestration architectures under identical workloads and execution conditions.
+
+The experiments investigate:
+
+- Scalability as worker count increases
+- Throughput under different workloads
+- Tail latency (P50 / P99)
+- Queue waiting time
+- Failure propagation
+- Worker utilization
+
+### Key Findings
+
+- Increasing the number of workers does **not** guarantee linear throughput improvement.
+- Workload characteristics often have a greater impact on performance than the orchestration architecture itself.
+- Lower average latency does not necessarily imply lower tail latency.
+- System bottlenecks shift as concurrency increases.
+- Failure propagation depends on the coordination strategy.
+
+---
+
+## Limitations
+
+This project is intended as an experimental framework rather than a production-ready distributed system.
+
+Current limitations include:
+
+- Single-machine simulation environment
+- Simplified queue implementation
+- Static routing in the Swarm architecture
+- No checkpointing or automatic task recovery
+- Network latency and distributed communication are not explicitly modeled
